@@ -13,7 +13,8 @@
     "axios": "^1.7.2",
     "html2canvas": "^1.4.1",
     "react": "^19.0.0-rc-f994737d14-20240522",
-    "react-dom": "^19.0.0-rc-f994737d14-20240522"
+    "react-dom": "^19.0.0-rc-f994737d14-20240522",
+    "react-router-dom": "^7.8.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
