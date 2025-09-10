@@ -1,30 +1,40 @@
-import React, { useState, useEffect, useRef } from 'react'; // Import useRef
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import html2canvas from 'html2canvas'; // Import html2canvas
+import html2canvas from 'html2canvas';
+import { ethers } from 'ethers';
 
-// Define the shape of a single track object from the Spotify API
+// --- VITAL: PASTE YOUR DEPLOYED CONTRACT DETAILS HERE ---
+// This is the address of your contract after you deployed it on the Amoy testnet
+const contractAddress = "YOUR_NEW_CONTRACT_ADDRESS_HERE"; 
+
+// This is the ABI from the "Compile" tab in Remix
+const contractABI = [ /* PASTE_YOUR_NEW_CONTRACT_ABI_HERE */ ];
+// ---------------------------------------------------------
+
+// Interface definitions (these do not change)
 interface Track {
   id: string;
   name: string;
   artists: { name: string }[];
   duration_ms: number;
 }
-
-// Define the props that this component will accept
 interface ReceiptProps {
   token: string;
 }
-
-// Define the possible time ranges for the API call
 type TimeRange = 'short_term' | 'medium_term' | 'long_term';
 
 const Receipt: React.FC<ReceiptProps> = ({ token }) => {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('short_term');
   const [userName, setUserName] = useState<string>('YOUR');
-  const receiptRef = useRef<HTMLDivElement>(null); // Create a ref for the receipt container
+  const receiptRef = useRef<HTMLDivElement>(null);
 
-  // This function converts milliseconds to a MM:SS format
+  // --- NEW STATE VARIABLES FOR MINTING ---
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isMinting, setIsMinting] = useState(false);
+  const [mintingStatus, setMintingStatus] = useState('');
+
+  // This function does not change
   const formatDuration = (ms: number): string => {
     const minutes = Math.floor(ms / 60000);
     const seconds = ((ms % 60000) / 1000).toFixed(0);
@@ -37,6 +47,7 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     long_term: 'ALL TIME',
   };
 
+  // This useEffect for fetching Spotify data does not change
   useEffect(() => {
     const fetchData = async () => {
       if (!token) return;
@@ -45,7 +56,6 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUserName(userProfile.data.display_name.toUpperCase());
-
         const { data } = await axios.get("https://api.spotify.com/v1/me/top/tracks", {
           headers: { Authorization: `Bearer ${token}` },
           params: { time_range: timeRange, limit: 10 }
@@ -55,78 +65,139 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
         console.error("Error fetching data from Spotify", error);
       }
     };
-
     fetchData();
   }, [token, timeRange]);
 
-  // Function to handle the download
-  const downloadReceipt = () => {
-    if (receiptRef.current) {
-      html2canvas(receiptRef.current, {
-        // Optional: Improve image quality
-        scale: 2, 
-        backgroundColor: null, // Use the element's background
-      }).then(canvas => {
-        const image = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = image;
-        link.download = `receiptify-${timeRange}.png`;
-        link.click();
-      });
+  // --- NEW FUNCTION: Connects to MetaMask ---
+  const connectWallet = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      alert("Please install MetaMask to mint an NFT.");
+      return null;
+    }
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      // Request account access
+      await provider.send("eth_requestAccounts", []);
+      const signer = await provider.getSigner();
+      setWalletAddress(await signer.getAddress());
+      return signer;
+    } catch (error) {
+      console.error("Wallet connection failed", error);
+      alert("Wallet connection failed. Please try again.");
+      return null;
     }
   };
 
+  // --- NEW FUNCTION: Replaces downloadReceipt with the full minting logic ---
+  const mintNFT = async () => {
+    if (!receiptRef.current) return;
+    setIsMinting(true);
+
+    try {
+        // Step 1: Connect wallet and verify the network
+        setMintingStatus("Connecting to wallet...");
+        const signer = await connectWallet();
+        if (!signer) throw new Error("Wallet connection was cancelled or failed.");
+        
+        const network = await signer.provider.getNetwork();
+        if (network.chainId !== 80002) { // 80002 is the chainId for Polygon Amoy
+            alert("Please switch your MetaMask wallet to the Polygon Amoy network to mint.");
+            throw new Error("Wrong network selected");
+        }
+
+        // Step 2: Generate the receipt image
+        setMintingStatus("Generating receipt image...");
+        const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
+        const imageData = canvas.toDataURL('image/png').split(',')[1]; // Get base64 string
+
+        // Step 3: Send data to your backend to upload to IPFS
+        setMintingStatus("Uploading assets to IPFS...");
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
+        const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
+            imageData,
+            userName,
+            timeRange: timeRangeLabels[timeRange],
+            tracks: tracks, // Send the full track data
+        });
+        const { tokenURI } = response.data;
+        if (!tokenURI) throw new Error("Failed to get tokenURI from backend.");
+
+        // Step 4: Call the smart contract to mint the NFT
+        setMintingStatus("Please confirm transaction in MetaMask...");
+        const contract = new ethers.Contract(contractAddress, contractABI, signer);
+        // We call the 'safeMint' function from our contract, passing the IPFS link
+        const transaction = await contract.safeMint(tokenURI);
+
+        // Step 5: Wait for the transaction to be confirmed on the blockchain
+        setMintingStatus("Minting in progress on the blockchain...");
+        await transaction.wait();
+
+        alert("NFT minted successfully! You can view it on Testnet OpenSea.");
+        setMintingStatus('');
+
+    } catch (error) {
+        console.error("Minting failed:", error);
+        alert("Minting failed. Please check the console for more details.");
+        setMintingStatus('Minting failed. Please try again.');
+    } finally {
+        setIsMinting(false);
+    }
+  };
+
+  // --- JSX (The View) ---
   return (
     <div className="w-full mt-8">
-      {/* Assign the ref to the receipt container */}
-      <div ref={receiptRef} className="p-6 bg-white text-black font-mono w-full max-w-sm mx-auto shadow-lg">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold">RECEIPTIFY</h2>
-          <p className="text-sm">{timeRangeLabels[timeRange]}</p>
-          <p className="text-sm">ORDER FOR {userName}</p>
-        </div>
-        
-        <div className="my-4 border-t border-b border-dashed border-black py-2">
-          {tracks.length > 0 ? (
-            tracks.map((track, index) => (
-              <div key={track.id} className="flex justify-between items-start text-sm my-2">
-                <div className="flex">
-                  <span className="mr-2 font-bold">{index + 1}.</span>
-                  <div className="pr-2">
-                    <p className="font-bold uppercase break-words">{track.name}</p>
-                    <p className="text-gray-600 uppercase break-words">
-                      {track.artists.map(artist => artist.name).join(', ')}
-                    </p>
-                  </div>
+        {/* The receipt display itself does not change */}
+        <div ref={receiptRef} className="p-6 bg-white text-black font-mono w-full max-w-sm mx-auto shadow-lg">
+            <div className="text-center">
+                <h2 className="text-2xl font-bold">RECEIPTIFY</h2>
+                <p className="text-sm">{timeRangeLabels[timeRange]}</p>
+                <p className="text-sm">ORDER FOR {userName}</p>
+            </div>
+            <div className="my-4 border-t border-b border-dashed border-black py-2">
+            {tracks.length > 0 ? (
+                tracks.map((track, index) => (
+                <div key={track.id} className="flex justify-between items-start text-sm my-2">
+                    <div className="flex">
+                    <span className="mr-2 font-bold">{index + 1}.</span>
+                    <div className="pr-2">
+                        <p className="font-bold uppercase break-words">{track.name}</p>
+                        <p className="text-gray-600 uppercase break-words">
+                        {track.artists.map(artist => artist.name).join(', ')}
+                        </p>
+                    </div>
+                    </div>
+                    <span className="font-bold whitespace-nowrap">{formatDuration(track.duration_ms)}</span>
                 </div>
-                <span className="font-bold whitespace-nowrap">{formatDuration(track.duration_ms)}</span>
-              </div>
-            ))
-          ) : (
-            <p className="text-center text-gray-500 py-4">Loading tracks...</p>
-          )}
+                ))
+            ) : (
+                <p className="text-center text-gray-500 py-4">Loading tracks...</p>
+            )}
+            </div>
+            <div className="text-center mt-6">
+                <p className="text-xs">THANK YOU FOR VISITING!</p>
+            </div>
         </div>
 
-        <div className="text-center mt-6">
-          <p className="text-xs">THANK YOU FOR VISITING!</p>
-          <p className="text-xs lowercase">your-app-url.com</p>
-        </div>
-      </div>
+        {/* --- UPDATED UI: Replaces the download button with minting controls --- */}
+        <div className="mt-8 flex flex-col items-center space-y-4">
+            <div className="flex justify-center space-x-2">
+                <button onClick={() => setTimeRange('short_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'short_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>Month</button>
+                <button onClick={() => setTimeRange('medium_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'medium_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>6 Months</button>
+                <button onClick={() => setTimeRange('long_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'long_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>All Time</button>
+            </div>
 
-      {/* UI Controls: Time Range Selector and Download Button */}
-      <div className="mt-8 flex flex-col items-center space-y-4">
-        <div className="flex justify-center space-x-2">
-          <button onClick={() => setTimeRange('short_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'short_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>Month</button>
-          <button onClick={() => setTimeRange('medium_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'medium_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>6 Months</button>
-          <button onClick={() => setTimeRange('long_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'long_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>All Time</button>
+            {!walletAddress ? (
+                <button onClick={connectWallet} className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full transition-colors">
+                    Connect Wallet to Mint
+                </button>
+            ) : (
+                <button onClick={mintNFT} disabled={isMinting} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-colors disabled:bg-gray-500">
+                    {isMinting ? 'Minting...' : 'Mint as NFT'}
+                </button>
+            )}
+            {isMinting && <p className="text-gray-300 animate-pulse">{mintingStatus}</p>}
         </div>
-        <button 
-          onClick={downloadReceipt}
-          className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-full transition-colors duration-300"
-        >
-          Download Receipt
-        </button>
-      </div>
     </div>
   );
 };
