@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Specifies the license for the code, a standard practice.
 pragma solidity ^0.8.20;
 
-// Imports code from the trusted OpenZeppelin library. This is the best practice for security.
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -14,7 +12,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract ReceiptNFT is ERC721, ERC721URIStorage, Ownable {
     // A counter to ensure every NFT has a unique ID.
-    private uint256 _nextTokenId;
+    uint256 private _nextTokenId;
 
     /**
      * @dev The constructor is run only once when the contract is deployed.
@@ -40,12 +38,7 @@ contract ReceiptNFT is ERC721, ERC721URIStorage, Ownable {
         _setTokenURI(tokenId, uri);
     }
 
-    // The following functions are required by Solidity because we are inheriting from multiple contracts
-    // that both define these functions. We are simply telling the compiler to use the standard behavior.
-
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);
-    }
+    // The following functions are overrides required by Solidity.
 
     function tokenURI(uint256 tokenId)
         public
@@ -54,5 +47,14 @@ contract ReceiptNFT is ERC721, ERC721URIStorage, Ownable {
         returns (string memory)
     {
         return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
 }
