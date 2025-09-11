@@ -1,0 +1,13 @@
+# This is a configuration file for Netlify deployments.
+
+[build]
+  # This command builds your site for production.
+  command = "npm run build"
+  # This is the directory that gets deployed.
+  publish = "dist"
+
+# The magic rule for Single-Page Applications:
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
