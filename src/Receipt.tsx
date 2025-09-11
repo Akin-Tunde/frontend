@@ -7,7 +7,7 @@ import { ethers, BrowserProvider } from 'ethers'; // CHANGE: Import BrowserProvi
 
 // --- VITAL: PASTE YOUR DEPLOYED CONTRACT DETAILS HERE ---
 // This is the address of your contract after you deployed it on Base
-const contractAddress = "YOUR_NEW_BASE_CONTRACT_ADDRESS"; 
+const contractAddress = "0x606ae64A2c95e4315Df694F44bd6204AA38B3EBa"; 
 
 // This is the ABI from the "Compile" tab in Remix (This likely won't change)
 const contractABI = [
