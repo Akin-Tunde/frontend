@@ -1,30 +1,25 @@
-
 // src/Receipt.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { ethers, BrowserProvider } from 'ethers';
+// --- FIX: Use a type-only import for ColorResult ---
+import { SketchPicker, type ColorResult } from 'react-color'; 
 
-// --- CHANGE: Import the contract address and ABI from the new file ---
+// Import contract details from the separate file
 import { contractAddress, contractABI } from './contract/contractInfo';
-// --------------------------------------------------------------------
 
-// --- NEW: Define Base network details ---
+// Base network details remain the same
 const baseMainnet = {
     chainId: '0x2105', // 8453 in decimal
     chainName: 'Base Mainnet',
-    nativeCurrency: {
-        name: 'Ethereum',
-        symbol: 'ETH',
-        decimals: 18,
-    },
+    nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
     rpcUrls: ['https://mainnet.base.org'],
     blockExplorerUrls: ['https://basescan.org'],
 };
 
-
-// Interface definitions (these do not change)
+// Interface definitions remain the same
 interface Track {
   id: string;
   name: string;
@@ -41,13 +36,22 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
   const [timeRange, setTimeRange] = useState<TimeRange>('short_term');
   const [userName, setUserName] = useState<string>('YOUR');
   const receiptRef = useRef<HTMLDivElement>(null);
+  
+  // --- NEW: State for Personalization and Color Themes ---
+  const [customTitle, setCustomTitle] = useState<string>('RECEIPTIFY');
+  const [customFooter, setCustomFooter] = useState<string>('THANK YOU FOR VISITING!');
+  const [primaryColor, setPrimaryColor] = useState<string>('#000000');
+  const [backgroundColor, setBackgroundColor] = useState<string>('#ffffff');
+  const [showPrimaryPicker, setShowPrimaryPicker] = useState<boolean>(false);
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState<boolean>(false);
 
-  // --- NEW STATE VARIABLES FOR MINTING ---
+
+  // State for minting process
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
   const [mintingStatus, setMintingStatus] = useState('');
 
-  // This function does not change
+  // Helper functions
   const formatDuration = (ms: number): string => {
     const minutes = Math.floor(ms / 60000);
     const seconds = ((ms % 60000) / 1000).toFixed(0);
@@ -60,7 +64,7 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     long_term: 'ALL TIME',
   };
 
-  // This useEffect for fetching Spotify data does not change
+  // Fetching Spotify data (no changes here)
   useEffect(() => {
     const fetchData = async () => {
       if (!token) return;
@@ -81,7 +85,10 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     fetchData();
   }, [token, timeRange]);
 
-  // --- NEW FUNCTION: Switches or adds the Base network ---
+  // All blockchain-related functions (switchToBaseNetwork, connectWallet, mintNFT) remain unchanged.
+  // ... (These functions are omitted for brevity but are still part of the component)
+  
+    // --- NEW FUNCTION: Switches or adds the Base network ---
   const switchToBaseNetwork = async (provider: BrowserProvider) => {
     try {
         await provider.send('wallet_switchEthereumChain', [{ chainId: baseMainnet.chainId }]);
@@ -159,8 +166,15 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
             userName,
             timeRange: timeRangeLabels[timeRange],
             tracks: tracks, // Send the full track data
-        });
-        const { tokenURI } = response.data;
+        // --- NEW: Send customization data ---
+    customization: {
+        title: customTitle,
+        footer: customFooter,
+        textColor: primaryColor,
+        backgroundColor: backgroundColor
+    }
+});
+const { tokenURI } = response.data;
         if (!tokenURI) throw new Error("Failed to get tokenURI from backend.");
 
         // Step 5: Call the smart contract to mint the NFT
@@ -185,17 +199,26 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     }
   };
 
+
   // --- JSX (The View) ---
   return (
     <div className="w-full mt-8">
-        {/* The receipt display itself does not change */}
-        <div ref={receiptRef} className="p-6 bg-white text-black font-mono w-full max-w-sm mx-auto shadow-lg">
+        {/* --- UPDATED: The receipt now uses dynamic styles and text from state --- */}
+        <div 
+            ref={receiptRef} 
+            className="p-6 font-mono w-full max-w-sm mx-auto shadow-lg"
+            style={{ backgroundColor: backgroundColor, color: primaryColor }} // Dynamic colors
+        >
             <div className="text-center">
-                <h2 className="text-2xl font-bold">RECEIPTIFY</h2>
+                {/* Dynamic Title */}
+                <h2 className="text-2xl font-bold uppercase">{customTitle}</h2>
                 <p className="text-sm">{timeRangeLabels[timeRange]}</p>
                 <p className="text-sm">ORDER FOR {userName}</p>
             </div>
-            <div className="my-4 border-t border-b border-dashed border-black py-2">
+            <div 
+                className="my-4 border-t border-b py-2"
+                style={{ borderColor: `${primaryColor}80`, borderStyle: 'dashed' }} // Dashed border with opacity
+            >
             {tracks.length > 0 ? (
                 tracks.map((track, index) => (
                 <div key={track.id} className="flex justify-between items-start text-sm my-2">
@@ -203,8 +226,8 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                     <span className="mr-2 font-bold">{index + 1}.</span>
                     <div className="pr-2">
                         <p className="font-bold uppercase break-words">{track.name}</p>
-                        <p className="text-gray-600 uppercase break-words">
-                        {track.artists.map(artist => artist.name).join(', ')}
+                        <p className="uppercase break-words" style={{ color: `${primaryColor}B3` }}>
+                            {track.artists.map(artist => artist.name).join(', ')}
                         </p>
                     </div>
                     </div>
@@ -212,16 +235,67 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                 </div>
                 ))
             ) : (
-                <p className="text-center text-gray-500 py-4">Loading tracks...</p>
+                <p className="text-center py-4" style={{ color: `${primaryColor}80` }}>Loading tracks...</p>
             )}
             </div>
             <div className="text-center mt-6">
-                <p className="text-xs">THANK YOU FOR VISITING!</p>
+                {/* Dynamic Footer */}
+                <p className="text-xs uppercase">{customFooter}</p>
             </div>
         </div>
 
-        {/* --- UPDATED UI: Replaces the download button with minting controls --- */}
-        <div className="mt-8 flex flex-col items-center space-y-4">
+        {/* --- NEW: Customization Panel --- */}
+        <div className="mt-8 p-6 bg-gray-800 rounded-lg max-w-sm mx-auto text-white">
+            <h3 className="text-lg font-bold text-center mb-4">Customize Your Receipt</h3>
+            
+            {/* Receipt Personalization Inputs */}
+            <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">Custom Title</label>
+                <input 
+                    type="text"
+                    value={customTitle}
+                    onChange={(e) => setCustomTitle(e.target.value)}
+                    className="w-full bg-gray-700 rounded-md p-2 text-sm"
+                />
+            </div>
+            <div className="mb-6">
+                <label className="block text-sm font-medium mb-1">Custom Footer</label>
+                <input 
+                    type="text"
+                    value={customFooter}
+                    onChange={(e) => setCustomFooter(e.target.value)}
+                    className="w-full bg-gray-700 rounded-md p-2 text-sm"
+                />
+            </div>
+
+            {/* Color Theme Controls */}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium mb-2">Text Color</label>
+                    <button onClick={() => setShowPrimaryPicker(!showPrimaryPicker)} className="p-2 rounded-md w-full" style={{ backgroundColor: primaryColor }} />
+                    {showPrimaryPicker && (
+                        <div className="absolute z-10 mt-2">
+                            <div className="fixed inset-0" onClick={() => setShowPrimaryPicker(false)}/>
+                            <SketchPicker color={primaryColor} onChange={(color: ColorResult) => setPrimaryColor(color.hex)} />
+                        </div>
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-2">Background Color</label>
+                    <button onClick={() => setShowBackgroundPicker(!showBackgroundPicker)} className="p-2 rounded-md w-full" style={{ backgroundColor: backgroundColor, border: `1px solid ${primaryColor}`}}/>
+                    {showBackgroundPicker && (
+                        <div className="absolute z-10 mt-2">
+                             <div className="fixed inset-0" onClick={() => setShowBackgroundPicker(false)}/>
+                            <SketchPicker color={backgroundColor} onChange={(color: ColorResult) => setBackgroundColor(color.hex)} />
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+
+
+        {/* Time Range and Minting controls remain below the customization panel */}
+        <div className="mt-8 flex flex-col items-center space-y-4 max-w-sm mx-auto">
             <div className="flex justify-center space-x-2">
                 <button onClick={() => setTimeRange('short_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'short_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>Month</button>
                 <button onClick={() => setTimeRange('medium_term')} className={`px-3 py-1 text-sm rounded transition-colors ${timeRange === 'medium_term' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>6 Months</button>
