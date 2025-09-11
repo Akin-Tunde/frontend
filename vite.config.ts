@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/postcss' // CHANGE THIS LINE
+import tailwindcss from 'tailwindcss' // THIS LINE IS CHANGED
 
 // https://vitejs.dev/config/
 export default defineConfig({
