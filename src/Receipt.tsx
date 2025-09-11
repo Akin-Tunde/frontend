@@ -18,9 +18,7 @@ import {
   Type,
   Layout,
   Clock,
-  Hash,
   Loader2,
-  Check,
   AlertCircle
 } from 'lucide-react';
 
