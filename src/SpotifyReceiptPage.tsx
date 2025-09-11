@@ -3,12 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import Receipt from './Receipt'; // The original component for tracks
 import ArtistReceipt from './ArtistReceipt'; // The new component for artists
+import GenreReceipt from './GenreReceipt'; // Import the new component
 
 function SpotifyReceiptPage() {
   const [token, setToken] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('Initializing...');
   // --- NEW: State to manage which tab is active ---
-  const [receiptType, setReceiptType] = useState<'tracks' | 'artists'>('tracks');
+
+  const [receiptType, setReceiptType] = useState<'tracks' | 'artists' | 'genres'>('tracks');
+
 
   useEffect(() => {
     const queryString = window.location.search;
@@ -30,34 +33,19 @@ function SpotifyReceiptPage() {
 
   if (token) {
     return (
-      <div className="bg-gray-900 min-h-screen flex flex-col items-center text-white p-4">
-        <main className="w-full max-w-lg mx-auto text-center">
-          {/* --- NEW: Tab Navigation --- */}
+    <div className="bg-gray-900 min-h-screen ...">
+        <main className="w-full max-w-lg ...">
+          {/* --- Add the third button to the tab navigation --- */}
           <div className="mb-8 p-1 bg-gray-800 rounded-full flex items-center">
-            <button
-              onClick={() => setReceiptType('tracks')}
-              className={`w-full py-2 px-4 rounded-full text-sm font-bold transition-colors ${
-                receiptType === 'tracks' ? 'bg-green-500 text-white' : 'text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              Top Tracks
-            </button>
-            <button
-              onClick={() => setReceiptType('artists')}
-              className={`w-full py-2 px-4 rounded-full text-sm font-bold transition-colors ${
-                receiptType === 'artists' ? 'bg-green-500 text-white' : 'text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              Top Artists
-            </button>
+            <button onClick={() => setReceiptType('tracks')} /* ... */>Top Tracks</button>
+            <button onClick={() => setReceiptType('artists')} /* ... */>Top Artists</button>
+            <button onClick={() => setReceiptType('genres')} className={`...`} >Top Genres</button>
           </div>
 
-          {/* --- NEW: Conditional Rendering of Components --- */}
-          {receiptType === 'tracks' ? (
-            <Receipt token={token} />
-          ) : (
-            <ArtistReceipt token={token} />
-          )}
+          {/* --- Update the conditional rendering to handle three components --- */}
+          {receiptType === 'tracks' && <Receipt token={token} />}
+          {receiptType === 'artists' && <ArtistReceipt token={token} />}
+          {receiptType === 'genres' && <GenreReceipt token={token} />}
         </main>
       </div>
     );

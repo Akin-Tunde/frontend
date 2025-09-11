@@ -1,15 +1,31 @@
-// src/Receipt.tsx
+// src/GenreReceipt.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { ethers, BrowserProvider } from 'ethers';
 import { SketchPicker, type ColorResult } from 'react-color';
-import SkeletonReceipt from './SkeletonReceipt';
 
 import { contractAddress, contractABI } from './contract/contractInfo';
+import SkeletonReceipt from './SkeletonReceipt'; // Import the skeleton component
 
-// Base network details remain the same
+// --- Interfaces for this component ---
+interface Genre {
+  name: string;
+  count: number; // How many times this genre appeared in the user's top artists
+}
+interface Artist { // We need this interface to process the initial fetch
+  id: string;
+  name: string;
+  genres: string[];
+}
+interface ReceiptProps {
+  token: string;
+}
+type ReceiptSize = 'compact' | 'standard' | 'large';
+type PaperEffect = 'clean' | 'torn' | 'stacked';
+
+// Base network details
 const baseMainnet = {
     chainId: '0x2105',
     chainName: 'Base Mainnet',
@@ -18,103 +34,114 @@ const baseMainnet = {
     blockExplorerUrls: ['https://basescan.org'],
 };
 
-// Interface definitions remain the same
-
-interface Track {
-  id: string;
-  name: string;
-  artists: { name: string }[];
-  duration_ms: number;
-  // Add the album property to the interface
-  album: {
-    images: { url: string }[];
-  };
-}
-
-interface ReceiptProps {
-  token: string;
-}
-type TimeRange = 'short_term' | 'medium_term' | 'long_term';
-type ReceiptSize = 'compact' | 'standard' | 'large';
-type PaperEffect = 'clean' | 'torn' | 'stacked';
-
-const Receipt: React.FC<ReceiptProps> = ({ token }) => {
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [timeRange, setTimeRange] = useState<TimeRange>('short_term');
+const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
+  // --- State for this component ---
+  const [genres, setGenres] = useState<Genre[]>([]);
   const [userName, setUserName] = useState<string>('YOUR');
   const receiptRef = useRef<HTMLDivElement>(null);
-  
-  // State for Personalization and Color Themes
-  const [customTitle, setCustomTitle] = useState<string>('RECEIPTIFY');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Customization state
+  const [customTitle, setCustomTitle] = useState<string>('TOP GENRES');
   const [customFooter, setCustomFooter] = useState<string>('THANK YOU FOR VISITING!');
   const [primaryColor, setPrimaryColor] = useState<string>('#000000');
   const [backgroundColor, setBackgroundColor] = useState<string>('#ffffff');
   const [showPrimaryPicker, setShowPrimaryPicker] = useState<boolean>(false);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState<boolean>(false);
-
-  // --- NEW: State for Track Limit ---
-  const [trackLimit, setTrackLimit] = useState<number>(10);
-
-  // --- NEW: State for the new features ---
-  const [showAlbumArt, setShowAlbumArt] = useState<boolean>(true);
+  const [genreLimit, setGenreLimit] = useState<number>(10);
   const [receiptSize, setReceiptSize] = useState<ReceiptSize>('standard');
   const [paperEffect, setPaperEffect] = useState<PaperEffect>('clean');
 
-  // State for minting process
+  // Minting State
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
   const [mintingStatus, setMintingStatus] = useState('');
 
-   // --- NEW: State for loading and errors ---
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
- 
-  // Helper functions
-  const formatDuration = (ms: number): string => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = ((ms % 60000) / 1000).toFixed(0);
-    return `${minutes}:${parseInt(seconds) < 10 ? '0' : ''}${seconds}`;
-  };
-
-  const timeRangeLabels: { [key in TimeRange]: string } = {
-    short_term: 'LAST MONTH',
-    medium_term: 'LAST 6 MONTHS',
-    long_term: 'ALL TIME',
-  };
-
-  // --- UPDATED: Data fetching now depends on trackLimit ---
+  // --- DATA FETCHING AND PROCESSING LOGIC ---
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDataAndProcessGenres = async () => {
       if (!token) return;
-       // --- Start loading and clear previous errors ---
       setLoading(true);
-      setError(null)
+      setError(null);
+      
       try {
+        // First, get the user's name
         const userProfile = await axios.get("https://api.spotify.com/v1/me", {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUserName(userProfile.data.display_name.toUpperCase());
-        const { data } = await axios.get("https://api.spotify.com/v1/me/top/tracks", {
+
+        // Then, fetch top 50 artists to get a rich sample of genres
+        const { data } = await axios.get("https://api.spotify.com/v1/me/top/artists", {
           headers: { Authorization: `Bearer ${token}` },
-          // The limit parameter is now dynamic based on our state
-          params: { time_range: timeRange, limit: trackLimit }
+          params: { 
+            time_range: 'long_term', // Use long_term for the most stable genre data
+            limit: 50 
+          }
         });
-        setTracks(data.items);
-     } catch (err) {
-        // --- Set an error message if the API call fails ---
-        console.error("Error fetching track data from Spotify", err);
-        setError("Failed to fetch your top tracks. The Spotify token may have expired. Please try logging in again.");
+
+        // Process the artist data to calculate top genres
+        const genreCounts: { [key: string]: number } = {};
+        data.items.forEach((artist: Artist) => {
+          artist.genres.forEach(genreName => {
+            genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
+          });
+        });
+
+        const sortedGenres = Object.entries(genreCounts)
+          .sort(([, countA], [, countB]) => countB - countA)
+          .map(([name, count]) => ({ name, count }));
+        
+        setGenres(sortedGenres);
+
+      } catch (err) {
+        console.error("Error fetching or processing genre data", err);
+        setError("Failed to calculate your top genres. The Spotify token may be invalid. Please log in again.");
       } finally {
-        // --- Stop loading regardless of success or failure ---
         setLoading(false);
       }
     };
-    fetchData();
-  }, [token, timeRange, trackLimit]);
+    fetchDataAndProcessGenres();
+  }, [token]);
 
-  
-  // --- UPDATED: mintNFT function now sends customization data ---
+  // Blockchain helper functions
+  const switchToBaseNetwork = async (provider: BrowserProvider) => {
+    try {
+        await provider.send('wallet_switchEthereumChain', [{ chainId: baseMainnet.chainId }]);
+    } catch (switchError: any) {
+        if (switchError.code === 4902) {
+            try {
+                await provider.send('wallet_addEthereumChain', [baseMainnet]);
+            } catch (addError) {
+                console.error("Failed to add Base network", addError);
+                throw new Error("Failed to add Base network to MetaMask.");
+            }
+        } else {
+            console.error("Failed to switch network", switchError);
+            throw new Error("Failed to switch to Base network.");
+        }
+    }
+  };
+
+  const connectWallet = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      alert("Please install MetaMask to mint an NFT.");
+      return null;
+    }
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      const signer = await provider.getSigner();
+      setWalletAddress(await signer.getAddress());
+      return signer;
+    } catch (error) {
+      console.error("Wallet connection failed", error);
+      alert("Wallet connection failed. Please try again.");
+      return null;
+    }
+  };
+
   const mintNFT = async () => {
     if (!receiptRef.current) return;
     setIsMinting(true);
@@ -136,9 +163,8 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
             setMintingStatus("Please switch to Base network...");
             await switchToBaseNetwork(provider);
         }
-
-        setMintingStatus("Generating receipt image...");
-        const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
+        
+        const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: 'transparent' });
         const imageData = canvas.toDataURL('image/png').split(',')[1];
 
         setMintingStatus("Uploading assets to IPFS...");
@@ -146,21 +172,19 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
         const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
             imageData,
             userName,
-            timeRange: timeRangeLabels[timeRange],
-            tracks: tracks,
-            // --- NEW: Send all customization data to the backend ---
+            timeRange: 'All Time', // Hardcoded for genres
+            genres: genres.slice(0, genreLimit), // Send the final genre list
+            receiptType: 'genres',
             customization: {
                 title: customTitle,
                 footer: customFooter,
                 textColor: primaryColor,
                 backgroundColor: backgroundColor,
-                trackLimit: trackLimit,
-           // --- NEW: Send the new feature states ---
-            showAlbumArt: showAlbumArt,
-            receiptSize: receiptSize,
-            paperEffect: paperEffect,
-        }
-    });
+                genreLimit: genreLimit,
+                receiptSize: receiptSize,
+                paperEffect: paperEffect,
+            }
+        });
         const { tokenURI } = response.data;
         if (!tokenURI) throw new Error("Failed to get tokenURI from backend.");
 
@@ -183,56 +207,11 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     }
   };
   
-  // Blockchain helper functions (connectWallet, switchToBaseNetwork) remain the same.
-  // ... (Omitted for brevity)
-    // --- NEW FUNCTION: Switches or adds the Base network ---
-  const switchToBaseNetwork = async (provider: BrowserProvider) => {
-    try {
-        await provider.send('wallet_switchEthereumChain', [{ chainId: baseMainnet.chainId }]);
-    } catch (switchError: any) {
-        // This error code indicates that the chain has not been added to MetaMask.
-        if (switchError.code === 4902) {
-            try {
-                await provider.send('wallet_addEthereumChain', [baseMainnet]);
-            } catch (addError) {
-                console.error("Failed to add Base network", addError);
-                throw new Error("Failed to add Base network to MetaMask.");
-            }
-        } else {
-            console.error("Failed to switch network", switchError);
-            throw new Error("Failed to switch to Base network.");
-        }
-    }
-  };
-
-  // --- NEW FUNCTION: Connects to MetaMask ---
-  const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      alert("Please install MetaMask to mint an NFT.");
-      return null;
-    }
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      // Request account access
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      setWalletAddress(await signer.getAddress());
-      return signer;
-    } catch (error) {
-      console.error("Wallet connection failed", error);
-      alert("Wallet connection failed. Please try again.");
-      return null;
-    }
-  };
-
-// --- NEW: Helper to get dynamic classes for receipt size ---
   const sizeClasses: Record<ReceiptSize, string> = {
-    compact: 'max-w-xs',
-    standard: 'max-w-sm',
-    large: 'max-w-md'
+    compact: 'max-w-xs', standard: 'max-w-sm', large: 'max-w-md'
   };
-  
-   // --- NEW: Conditional Rendering Logic ---
+
+  // --- Conditional Rendering for Loading and Error States ---
   if (loading) {
     return <SkeletonReceipt />;
   }
@@ -245,57 +224,42 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
       </div>
     );
   }
-   // --- JSX (The View) ---
+
+  // --- JSX (THE VIEW) FOR GENRES ---
   return (
     <div className="w-full mt-8">
-        {/* --- UPDATED: Receipt display with dynamic classes for size and paper effect --- */}
         <div 
             ref={receiptRef} 
-            // The outer div now controls the size and relative positioning for effects
             className={`font-mono mx-auto shadow-lg relative ${sizeClasses[receiptSize]}`}
-            // The background is made transparent when an effect is active to prevent color overlap
             style={{ backgroundColor: paperEffect === 'clean' ? backgroundColor : 'transparent' }}
         >
-            {/* Paper effect layers: These are positioned behind the main content */}
             {paperEffect === 'stacked' && (
               <>
                 <div className="absolute top-1 left-1 w-full h-full rounded-sm" style={{ backgroundColor: backgroundColor, transform: 'rotate(-1.5deg)', zIndex: 1 }}></div>
                 <div className="absolute top-0 left-0 w-full h-full rounded-sm" style={{ backgroundColor: backgroundColor, transform: 'rotate(1deg)', zIndex: 1 }}></div>
               </>
             )}
-
-            {/* Main receipt content div */}
             <div 
-                // The 'torn-edge' class is applied conditionally
                 className={`p-6 relative ${paperEffect === 'torn' ? 'torn-edge' : ''}`}
-                // This div always gets the background color and has a higher z-index
                 style={{ backgroundColor: backgroundColor, color: primaryColor, zIndex: 2 }}
             >
                 <div className="text-center">
                     <h2 className="text-2xl font-bold uppercase">{customTitle}</h2>
-                    <p className="text-sm">{timeRangeLabels[timeRange]}</p>
+                    <p className="text-sm">BASED ON ALL-TIME LISTENING</p>
                     <p className="text-sm">ORDER FOR {userName}</p>
                 </div>
                 <div className="my-4 border-t border-b py-2" style={{ borderColor: `${primaryColor}80`, borderStyle: 'dashed' }}>
-                {tracks.length > 0 ? (
-                    tracks.map((track, index) => (
-                    <div key={track.id} className="flex justify-between items-center text-sm my-2 gap-3">
-                        {/* --- Conditional Album Art --- */}
-                        {showAlbumArt && track.album.images.length > 0 && (
-                            <img src={track.album.images[0].url} alt={track.name} className="w-10 h-10 object-cover flex-shrink-0" />
-                        )}
-                        <div className="flex-grow text-left">
-                            <p className="font-bold uppercase break-words">{track.name}</p>
-                            <p className="uppercase break-words" style={{ color: `${primaryColor}B3` }}>
-                                {track.artists.map(artist => artist.name).join(', ')}
-                            </p>
+                {genres.slice(0, genreLimit).map((genre, index) => (
+                    <div key={genre.name} className="flex justify-between items-center text-sm my-2 py-1">
+                        <div className="flex items-center">
+                            <span className="font-bold w-6 text-center flex-shrink-0">{index + 1}.</span>
+                            <p className="font-bold uppercase break-words ml-2">{genre.name}</p>
                         </div>
-                        <span className="font-bold whitespace-nowrap">{formatDuration(track.duration_ms)}</span>
+                        <span className="font-mono text-xs px-2 py-1 rounded" style={{ backgroundColor: `${primaryColor}1A`, color: `${primaryColor}B3` }}>
+                            {genre.count} pts
+                        </span>
                     </div>
-                    ))
-                ) : (
-                    <p className="text-center py-4" style={{ color: `${primaryColor}80` }}>Loading tracks...</p>
-                )}
+                ))}
                 </div>
                 <div className="text-center mt-6">
                     <p className="text-xs uppercase">{customFooter}</p>
@@ -303,14 +267,12 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
             </div>
         </div>
 
-        {/* --- Full Customization Panel --- */}
+        {/* --- Customization Panel for Genres --- */}
         <div className="mt-8 p-6 bg-gray-800 rounded-lg max-w-sm mx-auto text-white space-y-6">
             <h3 className="text-lg font-bold text-center">Customize Your Receipt</h3>
             
-            {/* Section for Layout & Style */}
             <div className="space-y-4">
                 <h4 className="text-md font-semibold mb-2 text-center text-gray-400">Layout & Style</h4>
-                {/* Receipt Size */}
                 <div>
                     <label className="block text-sm font-medium mb-2">Receipt Size</label>
                     <div className="flex items-center gap-1 bg-gray-700 rounded-md p-1">
@@ -321,7 +283,6 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                         ))}
                     </div>
                 </div>
-                {/* Paper Effect */}
                 <div>
                     <label className="block text-sm font-medium mb-2">Paper Effect</label>
                     <div className="flex items-center gap-1 bg-gray-700 rounded-md p-1">
@@ -332,19 +293,11 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                         ))}
                     </div>
                 </div>
-                 {/* Album Art Toggle */}
-                 <div className="flex justify-between items-center pt-2">
-                    <label className="text-sm font-medium">Show Album Art</label>
-                    <button onClick={() => setShowAlbumArt(!showAlbumArt)} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${showAlbumArt ? 'bg-green-500' : 'bg-gray-600'}`}>
-                        <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${showAlbumArt ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                </div>
             </div>
 
-             {/* Section for Content & Colors */}
             <div className="space-y-4 pt-4 border-t border-gray-700">
-                 <h4 className="text-md font-semibold mb-2 text-center text-gray-400">Content & Colors</h4>
-                 <div>
+                <h4 className="text-md font-semibold mb-2 text-center text-gray-400">Content & Colors</h4>
+                <div>
                     <label className="block text-sm font-medium mb-1">Custom Title</label>
                     <input type="text" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)} className="w-full bg-gray-700 rounded-md p-2 text-sm"/>
                 </div>
@@ -376,34 +329,25 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                 </div>
             </div>
 
-            {/* Section for Track List */}
             <div className="space-y-4 pt-4 border-t border-gray-700">
-                <h4 className="text-md font-semibold mb-2 text-center text-gray-400">Track List</h4>
+                <h4 className="text-md font-semibold mb-2 text-center text-gray-400">Genre List</h4>
                 <div>
-                    <label className="block text-sm font-medium mb-2">Time Period</label>
-                     <div className="flex justify-center space-x-1 bg-gray-700 p-1 rounded-md">
-                        <button onClick={() => setTimeRange('short_term')} className={`w-full px-3 py-1 text-sm rounded transition-colors ${timeRange === 'short_term' ? 'bg-green-500 text-white' : 'hover:bg-gray-600'}`}>Month</button>
-                        <button onClick={() => setTimeRange('medium_term')} className={`w-full px-3 py-1 text-sm rounded transition-colors ${timeRange === 'medium_term' ? 'bg-green-500 text-white' : 'hover:bg-gray-600'}`}>6 Months</button>
-                        <button onClick={() => setTimeRange('long_term')} className={`w-full px-3 py-1 text-sm rounded transition-colors ${timeRange === 'long_term' ? 'bg-green-500 text-white' : 'hover:bg-gray-600'}`}>All Time</button>
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium mb-2">Number of Tracks</label>
+                    <label className="block text-sm font-medium mb-2">Number of Genres</label>
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1 bg-gray-700 rounded-md p-1">
-                            {[10, 25, 50].map(limit => (
-                                <button key={limit} onClick={() => setTrackLimit(limit)} className={`px-3 py-1 text-sm rounded-md transition-colors ${trackLimit === limit ? 'bg-green-500' : 'hover:bg-gray-600'}`}>
+                            {[10, 15, 25].map(limit => (
+                                <button key={limit} onClick={() => setGenreLimit(limit)} className={`px-3 py-1 text-sm rounded-md transition-colors ${genreLimit === limit ? 'bg-green-500' : 'hover:bg-gray-600'}`}>
                                     {limit}
                                 </button>
                             ))}
                         </div>
-                        <input type="number" min="1" max="50" value={trackLimit} onChange={(e) => setTrackLimit(Number(e.target.value))} className="w-full bg-gray-900 rounded-md p-2 text-sm text-center"/>
+                        <input type="number" min="1" max="50" value={genreLimit} onChange={(e) => setGenreLimit(Number(e.target.value))} className="w-full bg-gray-900 rounded-md p-2 text-sm text-center"/>
                     </div>
                 </div>
+                 <p className="text-xs text-gray-500 text-center pt-2">Genre data is calculated from your all-time top 50 artists for best accuracy.</p>
             </div>
         </div>
 
-        {/* --- Minting controls --- */}
         <div className="mt-8 flex flex-col items-center space-y-4 max-w-sm mx-auto">
             {!walletAddress ? (
                 <button onClick={connectWallet} className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full transition-colors">
@@ -411,13 +355,13 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                 </button>
             ) : (
                 <button onClick={mintNFT} disabled={isMinting} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-colors disabled:bg-gray-500">
-                    {isMinting ? 'Minting...' : 'Mint as NFT on Base'}
+                    {isMinting ? `Minting... (${mintingStatus})` : 'Mint as NFT on Base'}
                 </button>
             )}
             {isMinting && <p className="text-gray-300 animate-pulse">{mintingStatus}</p>}
         </div>
     </div>
   );
-// --- FIX: This closing brace was missing ---
 };
-export default Receipt;
+
+export default GenreReceipt;
