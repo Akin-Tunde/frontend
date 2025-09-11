@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjMyMDI2NCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDFGMkE1MkYwZjlDZDYwZGY4RDAwNTdjNGE1YTEwRUFlNjQyNjNCNDgifQ",
+    "payload": "eyJkb21haW4iOiJmcm9udGVuZC1hcmIubmV0bGlmeS5hcHAifQ",
+    "signature": "MHg4ZTE0MDEwYmQ0YjhmOTQwNzhlNGFhNDA4YjljMDFlMDdiZjIzNDhjNTI2NGQ3ZDE1MmViM2ViMmJiNTk2NDNiMGM5ZjRkYmI3MDc5MmZkNDg2ZTVhZTFmY2E2OTVjYjk1ZWM2NThjM2JmNTc2MzZiNGY2Y2JiMzMwZWQyN2Q2NTFi"
+  },
+  "frame": {
+    "version": "1",
+    "name": "Arb Spotify",
+    "iconUrl": "https://frontend-arb.netlify.app/icon.png",
+    "homeUrl": "https://frontend-arb.netlify.app",
+    "imageUrl": "https://frontend-arb.netlify.app/image.png",
+    "buttonTitle": "Check this out",
+    "splashImageUrl": "https://frontend-arb.netlify.app/splash.png",
+    "splashBackgroundColor": "#eeccff",
+    "webhookUrl": "https://frontend-arb.netlify.app/api/webhook"
+  }
+}
