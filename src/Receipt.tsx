@@ -1,13 +1,15 @@
+// src/Receipt.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
-import { ethers } from 'ethers';
+import { ethers, BrowserProvider } from 'ethers'; // CHANGE: Import BrowserProvider explicitly
 
 // --- VITAL: PASTE YOUR DEPLOYED CONTRACT DETAILS HERE ---
-// This is the address of your contract after you deployed it on the Amoy testnet
-const contractAddress = "0x606ae64A2c95e4315Df694F44bd6204AA38B3EBa"; 
+// This is the address of your contract after you deployed it on Base
+const contractAddress = "YOUR_NEW_BASE_CONTRACT_ADDRESS"; 
 
-// This is the ABI from the "Compile" tab in Remix
+// This is the ABI from the "Compile" tab in Remix (This likely won't change)
 const contractABI = [
 	{
 		"inputs": [],
@@ -569,6 +571,20 @@ const contractABI = [
 ];
 // ---------------------------------------------------------
 
+// --- NEW: Define Base network details ---
+const baseMainnet = {
+    chainId: '0x2105', // 8453 in decimal
+    chainName: 'Base Mainnet',
+    nativeCurrency: {
+        name: 'Ethereum',
+        symbol: 'ETH',
+        decimals: 18,
+    },
+    rpcUrls: ['https://mainnet.base.org'],
+    blockExplorerUrls: ['https://basescan.org'],
+};
+
+
 // Interface definitions (these do not change)
 interface Track {
   id: string;
@@ -626,6 +642,26 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     fetchData();
   }, [token, timeRange]);
 
+  // --- NEW FUNCTION: Switches or adds the Base network ---
+  const switchToBaseNetwork = async (provider: BrowserProvider) => {
+    try {
+        await provider.send('wallet_switchEthereumChain', [{ chainId: baseMainnet.chainId }]);
+    } catch (switchError: any) {
+        // This error code indicates that the chain has not been added to MetaMask.
+        if (switchError.code === 4902) {
+            try {
+                await provider.send('wallet_addEthereumChain', [baseMainnet]);
+            } catch (addError) {
+                console.error("Failed to add Base network", addError);
+                throw new Error("Failed to add Base network to MetaMask.");
+            }
+        } else {
+            console.error("Failed to switch network", switchError);
+            throw new Error("Failed to switch to Base network.");
+        }
+    }
+  };
+
   // --- NEW FUNCTION: Connects to MetaMask ---
   const connectWallet = async () => {
     if (typeof window.ethereum === 'undefined') {
@@ -646,29 +682,37 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     }
   };
 
-  // --- NEW FUNCTION: Replaces downloadReceipt with the full minting logic ---
+  // --- UPDATED FUNCTION: Replaces downloadReceipt with the full minting logic ---
   const mintNFT = async () => {
     if (!receiptRef.current) return;
     setIsMinting(true);
+    setMintingStatus("Initializing...");
 
     try {
-        // Step 1: Connect wallet and verify the network
+        // Step 1: Connect wallet and get the provider
         setMintingStatus("Connecting to wallet...");
-        const signer = await connectWallet();
-        if (!signer) throw new Error("Wallet connection was cancelled or failed.");
-        
-        const network = await signer.provider.getNetwork();
-        if (network.chainId !== 80002) { // 80002 is the chainId for Polygon Amoy
-            alert("Please switch your MetaMask wallet to the Polygon Amoy network to mint.");
-            throw new Error("Wrong network selected");
+        if (typeof window.ethereum === 'undefined') {
+          throw new Error("Please install MetaMask to mint an NFT.");
+        }
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        const signer = await provider.getSigner();
+        setWalletAddress(await signer.getAddress());
+
+        // Step 2: Verify the network and switch if necessary
+        setMintingStatus("Checking network...");
+        const network = await provider.getNetwork();
+        if (network.chainId !== BigInt(baseMainnet.chainId)) { // CHANGE: Check against Base chainId
+            setMintingStatus("Please switch to Base network...");
+            await switchToBaseNetwork(provider);
         }
 
-        // Step 2: Generate the receipt image
+        // Step 3: Generate the receipt image
         setMintingStatus("Generating receipt image...");
         const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
         const imageData = canvas.toDataURL('image/png').split(',')[1]; // Get base64 string
 
-        // Step 3: Send data to your backend to upload to IPFS
+        // Step 4: Send data to your backend to upload to IPFS
         setMintingStatus("Uploading assets to IPFS...");
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
         const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
@@ -680,22 +724,22 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
         const { tokenURI } = response.data;
         if (!tokenURI) throw new Error("Failed to get tokenURI from backend.");
 
-        // Step 4: Call the smart contract to mint the NFT
+        // Step 5: Call the smart contract to mint the NFT
         setMintingStatus("Please confirm transaction in MetaMask...");
         const contract = new ethers.Contract(contractAddress, contractABI, signer);
         // We call the 'safeMint' function from our contract, passing the IPFS link
         const transaction = await contract.safeMint(tokenURI);
 
-        // Step 5: Wait for the transaction to be confirmed on the blockchain
+        // Step 6: Wait for the transaction to be confirmed on the blockchain
         setMintingStatus("Minting in progress on the blockchain...");
         await transaction.wait();
 
-        alert("NFT minted successfully! You can view it on Testnet OpenSea.");
+        alert("NFT minted successfully! You can view it on OpenSea.");
         setMintingStatus('');
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Minting failed:", error);
-        alert("Minting failed. Please check the console for more details.");
+        alert(`Minting failed: ${error.message || "Please check the console for details."}`);
         setMintingStatus('Minting failed. Please try again.');
     } finally {
         setIsMinting(false);
@@ -751,7 +795,7 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                 </button>
             ) : (
                 <button onClick={mintNFT} disabled={isMinting} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-colors disabled:bg-gray-500">
-                    {isMinting ? 'Minting...' : 'Mint as NFT'}
+                    {isMinting ? 'Minting...' : 'Mint as NFT on Base'}
                 </button>
             )}
             {isMinting && <p className="text-gray-300 animate-pulse">{mintingStatus}</p>}
