@@ -22,6 +22,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+// --- NEW: Import DatePicker ---
+import DatePicker from 'react-datepicker';
+
 import { contractAddress, contractABI } from './contract/contractInfo';
 
 // Base network configuration
@@ -43,7 +46,7 @@ interface Artist {
 interface ReceiptProps {
   token: string;
 }
-type TimeRange = 'short_term' | 'medium_term' | 'long_term';
+type TimeRange = 'short_term' | 'medium_term' | 'long_term' | 'custom';
 type ReceiptSize = 'compact' | 'standard' | 'large';
 type PaperEffect = 'clean' | 'torn' | 'stacked';
 
@@ -55,6 +58,14 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+
+    // --- NEW: State for Custom Date Range ---
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7); // Default to one week ago
+    return d;
+  });
+  const [endDate, setEndDate] = useState<Date>(new Date());
 
   // Customization state
   const [customTitle, setCustomTitle] = useState<string>('TOP ARTISTS');
@@ -82,11 +93,12 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
   const [mintingStatus, setMintingStatus] = useState('');
   const [mintingStep, setMintingStep] = useState(0);
 
-  // Helper functions
+   // --- MODIFIED: Updated timeRangeLabels ---
   const timeRangeLabels: { [key in TimeRange]: string } = {
     short_term: 'LAST MONTH',
     medium_term: 'LAST 6 MONTHS',
     long_term: 'ALL TIME',
+    custom: `CUSTOM RANGE`,
   };
 
   const sizeClasses: Record<ReceiptSize, string> = {
@@ -260,7 +272,7 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
     );
   }
 
-  return (
+  return  (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900">
       <header className="bg-black/20 backdrop-blur-lg border-b border-white/10 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -281,18 +293,56 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className={`grid gap-8 ${showCustomization ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
           <div className={showCustomization ? 'lg:col-span-2' : 'max-w-2xl mx-auto w-full'}>
+            
+            {/* --- MODIFIED: Time Period Selector --- */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 mb-8 border border-white/20">
               <div className="flex items-center space-x-2 mb-4">
                 <Clock className="h-5 w-5 text-blue-400" />
                 <span className="text-white font-medium">Time Period</span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {Object.entries(timeRangeLabels).map(([key, label]) => (
-                  <button key={key} onClick={() => setTimeRange(key as TimeRange)} className={`py-3 px-4 rounded-xl font-medium transition-all text-sm ${timeRange === key ? 'bg-green-500 text-white shadow-lg' : 'text-gray-300 hover:text-white hover:bg-white/10'}`}>
-                    {label.split(' ').slice(-1)[0]}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {(['short_term', 'medium_term', 'long_term', 'custom'] as TimeRange[]).map((key) => (
+                  <button key={key} onClick={() => setTimeRange(key)} className={`py-3 px-4 rounded-xl font-medium transition-all text-sm capitalize ${timeRange === key ? 'bg-green-500 text-white shadow-lg' : 'text-gray-300 hover:text-white hover:bg-white/10'}`}>
+                    {key.includes('_') ? key.split('_')[0] : key}
                   </button>
                 ))}
               </div>
+              {/* --- NEW: Date Picker UI --- */}
+              {timeRange === 'custom' && (
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-2 text-center">Start Date</label>
+                      <DatePicker
+                        selected={startDate}
+                        onChange={(date: Date) => setStartDate(date)}
+                        selectsStart
+                        startDate={startDate}
+                        endDate={endDate}
+                        maxDate={new Date()}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-2 text-center">End Date</label>
+                       <DatePicker
+                        selected={endDate}
+                        onChange={(date: Date) => setEndDate(date)}
+                        selectsEnd
+                        startDate={startDate}
+                        endDate={endDate}
+                        minDate={startDate}
+                        maxDate={new Date()}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 bg-blue-900/20 text-blue-300 text-xs p-3 mt-4 rounded-lg border border-blue-500/20">
+                    <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <span>Custom range is calculated from your recent listening history and may only go back ~50 days due to Spotify API limits.</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-center mb-8">
@@ -306,11 +356,18 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
                 <div className={`p-6 relative ${paperEffect === 'torn' ? 'torn-edge' : ''}`} style={{ backgroundColor: backgroundColor, color: primaryColor, zIndex: 2 }}>
                   <div className="text-center mb-6">
                     <h2 className="text-2xl font-bold uppercase mb-2">{customTitle}</h2>
-                    <p className="text-sm opacity-80">{timeRangeLabels[timeRange]}</p>
+                    {/* --- MODIFIED: Receipt Header to show dynamic date range --- */}
+                    <p className="text-sm opacity-80">
+                      {timeRange === 'custom'
+                        ? `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`
+                        : timeRangeLabels[timeRange]
+                      }
+                    </p>
                     <p className="text-sm opacity-80">ORDER FOR {userName}</p>
                     <div className="mt-4 h-px bg-current opacity-20"></div>
                   </div>
                   <div className="space-y-3 mb-6">
+                    {/* --- MODIFIED: Added check for empty artists --- */}
                     {artists.length > 0 ? (
                       artists.map((artist, index) => (
                         <div key={artist.id} className="flex items-center gap-3 text-sm">
@@ -327,7 +384,19 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-8"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 opacity-50" /><p className="opacity-50">Loading artists...</p></div>
+                      <div className="text-center py-8">
+                        {loading ? (
+                          <>
+                           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 opacity-50" />
+                           <p className="opacity-50">Loading artists...</p>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="opacity-50 px-4">No listening history found for this period.</p>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                   <div className="text-center pt-4 border-t border-current border-opacity-20">
