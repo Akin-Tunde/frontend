@@ -1,4 +1,4 @@
-// src/ArtistReceipt.tsx - Enhanced version with modern UI/UX
+// src/ArtistReceipt.tsx - CORRECTED AND FINAL VERSION
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
@@ -23,8 +23,8 @@ import {
 } from 'lucide-react';
 
 import { contractAddress, contractABI } from './contract/contractInfo';
-
 import { sdk } from '@farcaster/miniapp-sdk';
+
 // Base network configuration
 const baseMainnet = {
   chainId: '0x2105',
@@ -56,6 +56,7 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [isFarcaster, setIsFarcaster] = useState(false);
 
   // Customization state
   const [customTitle, setCustomTitle] = useState<string>('TOP ARTISTS');
@@ -69,8 +70,6 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
   const [receiptSize, setReceiptSize] = useState<ReceiptSize>('standard');
   const [paperEffect, setPaperEffect] = useState<PaperEffect>('clean');
 
-  const [isFarcaster, setIsFarcaster] = useState(false);
-  
   // UI state
   const [showCustomization, setShowCustomization] = useState<boolean>(false);
   const [expandedSections, setExpandedSections] = useState({
@@ -91,28 +90,24 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
     medium_term: 'LAST 6 MONTHS',
     long_term: 'ALL TIME',
   };
-
   const sizeClasses: Record<ReceiptSize, string> = {
     compact: 'max-w-xs',
     standard: 'max-w-sm',
     large: 'max-w-md'
   };
-
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-useEffect(() => {
+  useEffect(() => {
     const checkForFarcaster = async () => {
       try {
-        // Ping the Farcaster client. If it responds, we are inside Farcaster.
         const appData = await sdk.app.getFrameData();
         if (appData) {
           console.log("Environment: Farcaster client detected.");
           setIsFarcaster(true);
         }
       } catch (error) {
-        // If it fails, we are in a normal browser.
         console.log("Environment: Standard browser detected.");
         setIsFarcaster(false);
       }
@@ -120,16 +115,13 @@ useEffect(() => {
     checkForFarcaster();
   }, []);
   
-  // Data fetching
   useEffect(() => {
     const fetchData = async () => {
       if (!token) return;
       setLoading(true);
       setError(null);
       try {
-        const userProfile = await axios.get("https://api.spotify.com/v1/me", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const userProfile = await axios.get("https://api.spotify.com/v1/me", { headers: { Authorization: `Bearer ${token}` } });
         setUserName(userProfile.data.display_name.toUpperCase());
         const { data } = await axios.get("https://api.spotify.com/v1/me/top/artists", {
           headers: { Authorization: `Bearer ${token}` },
@@ -138,7 +130,7 @@ useEffect(() => {
         setArtists(data.items);
       } catch (err) {
         console.error("Error fetching artist data from Spotify", err);
-        setError("Failed to fetch your top artists. The Spotify token may have expired. Please try logging in again.");
+        setError("Failed to fetch top artists. Token may have expired.");
       } finally {
         setLoading(false);
       }
@@ -146,7 +138,6 @@ useEffect(() => {
     fetchData();
   }, [token, timeRange, artistLimit]);
 
-  // Blockchain functions
   const switchToBaseNetwork = async (provider: BrowserProvider) => {
     try {
       await provider.send('wallet_switchEthereumChain', [{ chainId: baseMainnet.chainId }]);
@@ -154,24 +145,13 @@ useEffect(() => {
       if (switchError.code === 4902) {
         try {
           await provider.send('wallet_addEthereumChain', [baseMainnet]);
-        } catch (addError) {
-          console.error("Failed to add Base network", addError);
-          throw new Error("Failed to add Base network to MetaMask.");
-        }
-      } else {
-        console.error("Failed to switch network", switchError);
-        throw new Error("Failed to switch to Base network.");
-      }
+        } catch (addError) { throw new Error("Failed to add Base network."); }
+      } else { throw new Error("Failed to switch to Base network."); }
     }
   };
 
-  // src/ArtistReceipt.tsx
-
-  // --- REPLACE your old connectWallet function with this ---
   const connectWallet = async () => {
-    // The 'isFarcaster' flag determines the logic path
     if (isFarcaster) {
-      // FARCASTER NATIVE PATH
       try {
         const walletData = await sdk.wallet.connect();
         if (walletData) setWalletAddress(walletData.address);
@@ -180,7 +160,6 @@ useEffect(() => {
         alert("Could not connect Farcaster wallet.");
       }
     } else {
-      // STANDARD BROWSER (METAMASK) PATH
       if (typeof window.ethereum === 'undefined') {
         return alert("Please install MetaMask to use this feature.");
       }
@@ -190,30 +169,19 @@ useEffect(() => {
         if (accounts.length > 0) setWalletAddress(accounts[0]);
       } catch (error) {
         console.error("Browser wallet connection failed", error);
-        alert("Wallet connection failed. Please try again.");
+        alert("Wallet connection failed.");
       }
     }
   };
-  // --- END OF REPLACEMENT ---
 
-  // This is the complete replacement for your mintNFT function.
-// It uses the `isFarcaster` flag that you set in the useEffect hook.
-
-const mintNFT = async () => {
-    // Step 1: Pre-flight checks. Ensure a wallet is connected and the receipt exists.
+  const mintNFT = async () => {
     if (!walletAddress || !receiptRef.current) {
-        alert("Please connect your wallet before minting.");
-        return;
+        return alert("Please connect your wallet before minting.");
     }
-
-    // Step 2: Set the initial state for the minting process.
     setIsMinting(true);
-    setMintingStep(1); // Resetting the minting step counter
+    setMintingStep(1);
     setMintingStatus("Preparing the receipt...");
-
     try {
-        // Step 3: Generate the receipt image and upload it to IPFS via your backend.
-        // This logic is identical for both the Farcaster and browser paths.
         setMintingStep(2);
         setMintingStatus("Generating receipt image...");
         const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
@@ -223,8 +191,6 @@ const mintNFT = async () => {
         setMintingStatus("Uploading receipt to IPFS...");
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
         const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
-            // NOTE: You will need to slightly adjust this payload for each component
-            // For ArtistReceipt.tsx:
             imageData,
             userName,
             timeRange: timeRangeLabels[timeRange],
@@ -240,68 +206,39 @@ const mintNFT = async () => {
               receiptSize: receiptSize,
               paperEffect: paperEffect,
             }
-            // For Receipt.tsx, you would send 'tracks' instead of 'artists'
-            // For GenreReceipt.tsx, you would send 'genres'
         });
-        
         const { tokenURI } = response.data;
-        if (!tokenURI) {
-            throw new Error("Failed to get a valid tokenURI from the backend.");
-        }
+        if (!tokenURI) throw new Error("Failed to get a valid tokenURI from the backend.");
 
-        // --- Step 4: The HYBRID LOGIC begins here. Decide which minting path to take. ---
         if (isFarcaster) {
-            /**************************/
-            /*  FARCASTER MINT PATH   */
-            /**************************/
             setMintingStep(4);
             setMintingStatus("Preparing Farcaster transaction...");
-
-            // Create a read-only provider to prepare and later wait for the transaction.
             const provider = new ethers.JsonRpcProvider(baseMainnet.rpcUrls[0]);
             const contract = new ethers.Contract(contractAddress, contractABI, provider);
             const unpopulatedTx = await contract.safeMint.populateTransaction(tokenURI);
 
             setMintingStep(5);
-            setMintingStatus("Please confirm the transaction in your Farcaster client...");
-            
-            // Hand off the transaction to the Farcaster client to sign and send.
-            const txResponse = await sdk.wallet.sendTransaction({
-                to: contractAddress,
-                data: unpopulatedTx.data as `0x${string}`,
-            });
+            setMintingStatus("Please confirm in your Farcaster client...");
+            const txResponse = await sdk.wallet.sendTransaction({ to: contractAddress, data: unpopulatedTx.data as `0x${string}` });
 
             setMintingStep(6);
             setMintingStatus(`Transaction sent! Waiting for confirmation...`);
             await provider.waitForTransaction(txResponse.hash);
-
         } else {
-            /**************************/
-            /* BROWSER (METAMASK) PATH*/
-            /**************************/
             setMintingStep(4);
             setMintingStatus("Connecting to MetaMask...");
-            
-            if (typeof window.ethereum === 'undefined') {
-                throw new Error("MetaMask is not installed. Please install it to continue.");
-            }
-            
-            // Request a signer from the browser wallet (MetaMask).
+            if (typeof window.ethereum === 'undefined') throw new Error("MetaMask is not installed.");
             const provider = new ethers.BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
 
-            // Check if the user is on the correct network (Base Mainnet).
             const network = await provider.getNetwork();
             if (network.chainId !== BigInt(baseMainnet.chainId)) {
-                setMintingStatus("Incorrect network. Please switch to Base Mainnet in MetaMask.");
-                // The switchToBaseNetwork function will prompt the user to switch.
-                await switchToBaseNetwork(provider); 
+                setMintingStatus("Incorrect network. Please switch to Base Mainnet.");
+                await switchToBaseNetwork(provider);
             }
 
             setMintingStep(5);
-            setMintingStatus("Please confirm the transaction in MetaMask...");
-
-            // Create a contract instance with the signer and send the transaction.
+            setMintingStatus("Please confirm in MetaMask...");
             const contract = new ethers.Contract(contractAddress, contractABI, signer);
             const transaction = await contract.safeMint(tokenURI);
 
@@ -309,52 +246,20 @@ const mintNFT = async () => {
             setMintingStatus("Transaction sent! Waiting for confirmation...");
             await transaction.wait();
         }
-
-        // --- Step 5: Final success state, common to both paths ---
         setMintingStep(7);
         setMintingStatus("Success! Your NFT has been minted.");
-        alert("NFT minted successfully! You can view it on an explorer like OpenSea or BaseScan.");
-
+        alert("NFT minted successfully!");
     } catch (error: any) {
-        // Generic error handling for both paths.
-        console.error("A critical error occurred during the minting process:", error);
-        alert(`Minting failed: ${error.message || "An unknown error occurred. Please check the console for details."}`);
+        console.error("Minting process error:", error);
+        alert(`Minting failed: ${error.message || "An unknown error occurred."}`);
         setMintingStatus('Minting failed. Please try again.');
     } finally {
-        // Final cleanup, common to both paths.
         setIsMinting(false);
         setMintingStep(0);
     }
-};
-
-      const { tokenURI } = response.data;
-      if (!tokenURI) throw new Error("Failed to get tokenURI from backend.");
-
-      setMintingStep(5);
-      setMintingStatus("Confirming transaction...");
-      const contract = new ethers.Contract(contractAddress, contractABI, signer);
-      const transaction = await contract.safeMint(tokenURI);
-
-      setMintingStep(6);
-      setMintingStatus("Minting on blockchain...");
-      await transaction.wait();
-
-      setMintingStep(7);
-      setMintingStatus("Success!");
-      alert("NFT minted successfully! You can view it on OpenSea.");
-
-    } catch (error: any) {
-      console.error("Minting failed:", error);
-      alert(`Minting failed: ${error.message || "Please check the console for details."}`);
-      setMintingStatus('Minting failed. Please try again.');
-    } finally {
-      setIsMinting(false);
-      setMintingStep(0);
-    }
   };
-
-  // Loading and error states
-  if (loading) {
+  
+if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 flex items-center justify-center p-4">
         <SkeletonReceipt />
@@ -393,7 +298,6 @@ const mintNFT = async () => {
           </div>
         </div>
       </header>
-
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className={`grid gap-8 ${showCustomization ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
           <div className={showCustomization ? 'lg:col-span-2' : 'max-w-2xl mx-auto w-full'}>
@@ -410,7 +314,6 @@ const mintNFT = async () => {
                 ))}
               </div>
             </div>
-
             <div className="flex justify-center mb-8">
               <div ref={receiptRef} className={`font-mono shadow-2xl relative transition-transform duration-300 hover:scale-[1.02] ${sizeClasses[receiptSize]}`} style={{ backgroundColor: paperEffect === 'clean' ? backgroundColor : 'transparent' }}>
                 {paperEffect === 'stacked' && (
@@ -455,13 +358,12 @@ const mintNFT = async () => {
                 </div>
               </div>
             </div>
-            
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {/* NOTE: You need to implement the handleDownloadImage function */}
               <button className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
                 <Download className="h-4 w-4" />
                 <span>Download Image</span>
               </button>
-              
               {!walletAddress ? (
                 <button 
                   onClick={connectWallet}
@@ -476,16 +378,11 @@ const mintNFT = async () => {
                   disabled={isMinting}
                   className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
                 >
-                  {isMinting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wallet className="h-4 w-4" />
-                  )}
+                  {isMinting ? ( <Loader2 className="h-4 w-4 animate-spin" /> ) : ( <Wallet className="h-4 w-4" /> )}
                   <span>{isMinting ? 'Minting...' : 'Mint as NFT'}</span>
                 </button>
               )}
             </div>
-
             {isMinting && (
               <div className="mt-6 bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
                 <div className="flex items-center space-x-3 mb-4">
@@ -498,23 +395,18 @@ const mintNFT = async () => {
                     <span className="text-white">{Math.round((mintingStep / 7) * 100)}%</span>
                   </div>
                   <div className="w-full bg-gray-700 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${(mintingStep / 7) * 100}%` }}
-                    ></div>
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${(mintingStep / 7) * 100}%` }} ></div>
                   </div>
                   <p className="text-gray-300 text-sm">{mintingStatus}</p>
                 </div>
               </div>
             )}
           </div>
-
           {showCustomization && (
             <div className="lg:col-span-1">
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 overflow-hidden sticky top-24">
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2"><Palette className="h-5 w-5" /><span>Customization</span></h3>
-                  
                   <div className="mb-6">
                     <button onClick={() => toggleSection('appearance')} className="flex items-center justify-between w-full text-left text-white font-medium mb-4 hover:text-green-400 transition-colors">
                       <div className="flex items-center space-x-2"><Palette className="h-4 w-4" /><span>Appearance</span></div>
@@ -526,11 +418,7 @@ const mintNFT = async () => {
                           <div>
                             <label className="block text-xs text-gray-400 mb-2">Text Color</label>
                             <div className="relative">
-                              <button
-                                onClick={() => setShowPrimaryPicker(!showPrimaryPicker)}
-                                className="w-full h-10 rounded-lg border border-white/20 cursor-pointer"
-                                style={{ backgroundColor: primaryColor }}
-                              />
+                              <button onClick={() => setShowPrimaryPicker(!showPrimaryPicker)} className="w-full h-10 rounded-lg border border-white/20 cursor-pointer" style={{ backgroundColor: primaryColor }} />
                               {showPrimaryPicker && (
                                 <div className="absolute z-10 mt-2">
                                   <div className="fixed inset-0" onClick={() => setShowPrimaryPicker(false)}/>
@@ -542,11 +430,7 @@ const mintNFT = async () => {
                           <div>
                             <label className="block text-xs text-gray-400 mb-2">Background</label>
                             <div className="relative">
-                              <button
-                                onClick={() => setShowBackgroundPicker(!showBackgroundPicker)}
-                                className="w-full h-10 rounded-lg border border-white/20 cursor-pointer"
-                                style={{ backgroundColor: backgroundColor }}
-                              />
+                              <button onClick={() => setShowBackgroundPicker(!showBackgroundPicker)} className="w-full h-10 rounded-lg border border-white/20 cursor-pointer" style={{ backgroundColor: backgroundColor }} />
                               {showBackgroundPicker && (
                                 <div className="absolute z-10 mt-2">
                                   <div className="fixed inset-0" onClick={() => setShowBackgroundPicker(false)}/>
@@ -567,7 +451,6 @@ const mintNFT = async () => {
                       </div>
                     )}
                   </div>
-
                   <div className="mb-6">
                     <button onClick={() => toggleSection('content')} className="flex items-center justify-between w-full text-left text-white font-medium mb-4 hover:text-green-400 transition-colors">
                       <div className="flex items-center space-x-2"><Type className="h-4 w-4" /><span>Content</span></div>
@@ -586,7 +469,6 @@ const mintNFT = async () => {
                       </div>
                     )}
                   </div>
-
                   <div className="mb-6">
                     <button onClick={() => toggleSection('layout')} className="flex items-center justify-between w-full text-left text-white font-medium mb-4 hover:text-green-400 transition-colors">
                       <div className="flex items-center space-x-2"><Layout className="h-4 w-4" /><span>Layout</span></div>
