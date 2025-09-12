@@ -1,4 +1,4 @@
-// src/main.tsx - UPDATED
+// src/main.tsx - CORRECTED AND FINAL
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -10,15 +10,12 @@ import './datepicker.css';
 // --- WAGMI SETUP ---
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { base } from 'wagmi/chains';
-
-// 1. CORRECT THE IMPORT NAME HERE
 import { farcasterConnector } from '@farcaster/miniapp-wagmi-connector';
 import { injected } from 'wagmi/connectors';
 
 const config = createConfig({
   chains: [base],
   connectors: [
-    // 2. USE THE CORRECTED NAME HERE
     farcasterConnector(), 
     injected(),
   ],
@@ -35,7 +32,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <App />
       </BrowserRouter>
     </WagmiProvider>
-  </React.StrictMode>
-);    </WagmiProvider>
   </React.StrictMode>
 );
