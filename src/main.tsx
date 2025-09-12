@@ -1,4 +1,4 @@
-// src/main.tsx - THIS CODE IS CORRECT
+// src/main.tsx - FINAL AND CORRECTED VERSION
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -10,18 +10,18 @@ import './datepicker.css';
 // --- WAGMI SETUP ---
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { base } from 'wagmi/chains';
-import { farcasterConnector } from '@farcaster/miniapp-wagmi-connector';
-import { injected } from 'wagmi/connectors';
+// This is the new, correct import format you provided
+import { farcasterMiniApp as miniAppConnector } from '@farcaster/miniapp-wagmi-connector';
 
-const config = createConfig({
+export const config = createConfig({
   chains: [base],
-  connectors: [
-    farcasterConnector(), 
-    injected(),
-  ],
   transports: {
     [base.id]: http(),
   },
+  // We are now only providing the Farcaster connector
+  connectors: [
+    miniAppConnector()
+  ]
 });
 // --- END OF WAGMI SETUP ---
 
