@@ -9,11 +9,19 @@ import { Routes, Route, Link } from 'react-router-dom';
 import SpotifyReceiptPage from './SpotifyReceiptPage';
 import LastFmReceipt from './LastFmReceipt'; // Corrected the import name if file is astFmReceipt.tsx
 
+import { sdk } from '@farcaster/miniapp-sdk';
 
 // Enhanced Homepage Component
 const HomePage = () => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
+useEffect(() => {
+    // This tells the Farcaster client (e.g., Warpcast) that your app's
+    // initial UI has loaded and is ready to be displayed.
+    // It's best practice to wrap it in a catch block.
+    sdk.actions.ready().catch(err => console.error("Farcaster SDK ready() failed", err));
 
+    // The empty dependency array [] ensures this effect runs only once.
+  }, []);
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
