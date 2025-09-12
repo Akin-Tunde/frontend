@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
-import { SketchPicker, type ColorResult } from 'react-color';
+import { SketchPicker } from 'react-color';
+import type { ColorResult } from 'react-color';
 import SkeletonReceipt from './SkeletonReceipt';
 import {
   Tags,
