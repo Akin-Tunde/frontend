@@ -8,32 +8,34 @@ import './index.css';
 import './datepicker.css';
 
 // --- WAGMI SETUP ---
-import { WagmiProvider, createConfig } from 'wagmi';
-import { base } from 'wagmi/chains'; // Import the Base chain configuration
-import { farcasterWagmiConnector } from '@farcaster/miniapp-wagmi-connector';
-import { injected } from 'wagmi/connectors'; // For MetaMask and other browser wallets
+import { WagmiProvider, createConfig, http } from 'wagmi';
+import { base } from 'wagmi/chains';
 
-// 1. Create the Wagmi config
+// 1. CORRECT THE IMPORT NAME HERE
+import { farcasterConnector } from '@farcaster/miniapp-wagmi-connector';
+import { injected } from 'wagmi/connectors';
+
 const config = createConfig({
-  chains: [base], // Specify the blockchain you're working on
+  chains: [base],
   connectors: [
-    farcasterWagmiConnector(), // This will automatically activate inside Farcaster clients
-    injected(),               // This is the fallback for standard browsers (MetaMask)
+    // 2. USE THE CORRECTED NAME HERE
+    farcasterConnector(), 
+    injected(),
   ],
   transports: {
-    [base.id]: http(), // viem requires a transport, http() is a basic one
+    [base.id]: http(),
   },
 });
-
 // --- END OF WAGMI SETUP ---
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {/* 2. Wrap your entire app with the WagmiProvider */}
     <WagmiProvider config={config}>
       <BrowserRouter>
         <App />
       </BrowserRouter>
     </WagmiProvider>
+  </React.StrictMode>
+);    </WagmiProvider>
   </React.StrictMode>
 );
