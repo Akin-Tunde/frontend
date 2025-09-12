@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { contractAddress, contractABI } from './contract/contractInfo';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 // Base network configuration
 const baseMainnet = {
@@ -33,18 +34,9 @@ const baseMainnet = {
 };
 
 // Interface definitions
-interface Genre {
-  name: string;
-  count: number;
-}
-interface Artist {
-  id: string;
-  name: string;
-  genres: string[];
-}
-interface ReceiptProps {
-  token: string;
-}
+interface Genre { name: string; count: number; }
+interface Artist { id: string; name: string; genres: string[]; }
+interface ReceiptProps { token: string; }
 type ReceiptSize = 'compact' | 'standard' | 'large';
 type PaperEffect = 'clean' | 'torn' | 'stacked';
 
@@ -55,6 +47,7 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [isFarcaster, setIsFarcaster] = useState(false);
 
   // Customization state
   const [customTitle, setCustomTitle] = useState<string>('TOP GENRES');
@@ -69,11 +62,7 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
 
   // UI state
   const [showCustomization, setShowCustomization] = useState<boolean>(false);
-  const [expandedSections, setExpandedSections] = useState({
-    appearance: true,
-    content: false,
-    layout: false,
-  });
+  const [expandedSections, setExpandedSections] = useState({ appearance: true, content: false, layout: false });
 
   // Minting state
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -81,56 +70,64 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
   const [mintingStatus, setMintingStatus] = useState('');
   const [mintingStep, setMintingStep] = useState(0);
 
-  const sizeClasses: Record<ReceiptSize, string> = {
-    compact: 'max-w-xs',
-    standard: 'max-w-sm',
-    large: 'max-w-md'
-  };
+  const sizeClasses: Record<ReceiptSize, string> = { compact: 'max-w-xs', standard: 'max-w-sm', large: 'max-w-md' };
+  const toggleSection = (section: keyof typeof expandedSections) => setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
 
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
+  useEffect(() => {
+    const checkForFarcaster = async () => {
+      try {
+        const appData = await sdk.app.getFrameData();
+        if (appData) setIsFarcaster(true);
+      } catch (error) {
+        setIsFarcaster(false);
+      }
+    };
+    checkForFarcaster();
+  }, []);
 
-  // Data fetching and processing
   useEffect(() => {
     const fetchDataAndProcessGenres = async () => {
       if (!token) return;
       setLoading(true);
       setError(null);
       try {
-        const userProfile = await axios.get("https://api.spotify.com/v1/me", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const userProfile = await axios.get("https://api.spotify.com/v1/me", { headers: { Authorization: `Bearer ${token}` } });
         setUserName(userProfile.data.display_name.toUpperCase());
-
         const { data } = await axios.get("https://api.spotify.com/v1/me/top/artists", {
           headers: { Authorization: `Bearer ${token}` },
           params: { time_range: 'long_term', limit: 50 }
         });
-
         const genreCounts: { [key: string]: number } = {};
-        data.items.forEach((artist: Artist) => {
-          artist.genres.forEach(genreName => {
-            genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
-          });
-        });
-
+        data.items.forEach((artist: Artist) => artist.genres.forEach(genreName => {
+          genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
+        }));
         const sortedGenres = Object.entries(genreCounts)
           .sort(([, countA], [, countB]) => countB - countA)
           .map(([name, count]) => ({ name, count }));
         setGenres(sortedGenres);
-
       } catch (err) {
-        console.error("Error fetching or processing genre data", err);
-        setError("Failed to calculate your top genres. The Spotify token may be invalid or expired. Please try logging in again.");
+        setError("Failed to calculate top genres. Token may be expired.");
       } finally {
         setLoading(false);
       }
     };
     fetchDataAndProcessGenres();
   }, [token]);
+  
+  const handleDownloadImage = async () => {
+    if (!receiptRef.current) return;
+    try {
+        const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
+        const link = document.createElement('a');
+        link.download = `receiptify-genres-${userName.toLowerCase().replace(' ', '-')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    } catch (error) {
+        console.error('Error downloading image:', error);
+        alert('Could not download image.');
+    }
+  };
 
-  // Blockchain functions
   const switchToBaseNetwork = async (provider: BrowserProvider) => {
     try {
       await provider.send('wallet_switchEthereumChain', [{ chainId: baseMainnet.chainId }]);
@@ -138,110 +135,116 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
       if (switchError.code === 4902) {
         try {
           await provider.send('wallet_addEthereumChain', [baseMainnet]);
-        } catch (addError) {
-          console.error("Failed to add Base network", addError);
-          throw new Error("Failed to add Base network to MetaMask.");
-        }
-      } else {
-        console.error("Failed to switch network", switchError);
-        throw new Error("Failed to switch to Base network.");
-      }
+        } catch (addError) { throw new Error("Failed to add Base network."); }
+      } else { throw new Error("Failed to switch to Base network."); }
     }
   };
 
   const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      alert("Please install MetaMask to mint an NFT.");
-      return null;
-    }
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      setWalletAddress(await signer.getAddress());
-      return signer;
-    } catch (error) {
-      console.error("Wallet connection failed", error);
-      alert("Wallet connection failed. Please try again.");
-      return null;
+    if (isFarcaster) {
+      try {
+        const walletData = await sdk.wallet.connect();
+        if (walletData) setWalletAddress(walletData.address);
+      } catch (error) {
+        alert("Could not connect Farcaster wallet.");
+      }
+    } else {
+      if (typeof window.ethereum === 'undefined') {
+        return alert("Please install MetaMask to use this feature.");
+      }
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send("eth_requestAccounts", []);
+        if (accounts.length > 0) setWalletAddress(accounts[0]);
+      } catch (error) {
+        alert("Wallet connection failed.");
+      }
     }
   };
 
   const mintNFT = async () => {
-    if (!receiptRef.current) return;
+    if (!walletAddress || !receiptRef.current) {
+        return alert("Please connect your wallet before minting.");
+    }
     setIsMinting(true);
     setMintingStep(1);
-    setMintingStatus("Connecting to wallet...");
-
+    setMintingStatus("Preparing the receipt...");
     try {
-      if (typeof window.ethereum === 'undefined') {
-        throw new Error("Please install MetaMask to mint an NFT.");
-      }
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      setWalletAddress(await signer.getAddress());
+        setMintingStep(2);
+        setMintingStatus("Generating receipt image...");
+        const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
+        const imageData = canvas.toDataURL('image/png').split(',')[1];
 
-      setMintingStep(2);
-      setMintingStatus("Checking network...");
-      const network = await provider.getNetwork();
-      if (network.chainId !== BigInt(baseMainnet.chainId)) {
-        setMintingStatus("Switching to Base network...");
-        await switchToBaseNetwork(provider);
-      }
+        setMintingStep(3);
+        setMintingStatus("Uploading receipt to IPFS...");
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
+        const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
+            imageData,
+            userName,
+            timeRange: 'All Time',
+            genres: genres.slice(0, genreLimit),
+            receiptType: 'genres',
+            customization: {
+              title: customTitle,
+              footer: customFooter,
+              textColor: primaryColor,
+              backgroundColor: backgroundColor,
+              genreLimit: genreLimit,
+              receiptSize: receiptSize,
+              paperEffect: paperEffect,
+            }
+        });
+        const { tokenURI } = response.data;
+        if (!tokenURI) throw new Error("Failed to get a valid tokenURI from the backend.");
 
-      setMintingStep(3);
-      setMintingStatus("Generating receipt image...");
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
-      const imageData = canvas.toDataURL('image/png').split(',')[1];
+        if (isFarcaster) {
+            setMintingStep(4);
+            setMintingStatus("Preparing Farcaster transaction...");
+            const provider = new ethers.JsonRpcProvider(baseMainnet.rpcUrls[0]);
+            const contract = new ethers.Contract(contractAddress, contractABI, provider);
+            const unpopulatedTx = await contract.safeMint.populateTransaction(tokenURI);
 
-      setMintingStep(4);
-      setMintingStatus("Uploading to IPFS...");
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
-      const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
-        imageData,
-        userName,
-        timeRange: 'All Time', // Hardcoded for genres
-        genres: genres.slice(0, genreLimit), // Send the final genre list
-        receiptType: 'genres',
-        customization: {
-          title: customTitle,
-          footer: customFooter,
-          textColor: primaryColor,
-          backgroundColor: backgroundColor,
-          genreLimit: genreLimit,
-          receiptSize: receiptSize,
-          paperEffect: paperEffect,
+            setMintingStep(5);
+            setMintingStatus("Please confirm in your Farcaster client...");
+            const txResponse = await sdk.wallet.sendTransaction({ to: contractAddress, data: unpopulatedTx.data as `0x${string}` });
+
+            setMintingStep(6);
+            setMintingStatus(`Transaction sent! Waiting for confirmation...`);
+            await provider.waitForTransaction(txResponse.hash);
+        } else {
+            setMintingStep(4);
+            setMintingStatus("Connecting to MetaMask...");
+            if (typeof window.ethereum === 'undefined') throw new Error("MetaMask is not installed.");
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+
+            const network = await provider.getNetwork();
+            if (network.chainId !== BigInt(baseMainnet.chainId)) {
+                setMintingStatus("Incorrect network. Please switch to Base Mainnet.");
+                await switchToBaseNetwork(provider);
+            }
+
+            setMintingStep(5);
+            setMintingStatus("Please confirm in MetaMask...");
+            const contract = new ethers.Contract(contractAddress, contractABI, signer);
+            const transaction = await contract.safeMint(tokenURI);
+
+            setMintingStep(6);
+            setMintingStatus("Transaction sent! Waiting for confirmation...");
+            await transaction.wait();
         }
-      });
-
-      const { tokenURI } = response.data;
-      if (!tokenURI) throw new Error("Failed to get tokenURI from backend.");
-
-      setMintingStep(5);
-      setMintingStatus("Confirming transaction...");
-      const contract = new ethers.Contract(contractAddress, contractABI, signer);
-      const transaction = await contract.safeMint(tokenURI);
-
-      setMintingStep(6);
-      setMintingStatus("Minting on blockchain...");
-      await transaction.wait();
-
-      setMintingStep(7);
-      setMintingStatus("Success!");
-      alert("NFT minted successfully! You can view it on OpenSea.");
-
+        setMintingStep(7);
+        setMintingStatus("Success! Your NFT has been minted.");
+        alert("NFT minted successfully!");
     } catch (error: any) {
-      console.error("Minting failed:", error);
-      alert(`Minting failed: ${error.message || "Please check the console for details."}`);
-      setMintingStatus('Minting failed. Please try again.');
+        alert(`Minting failed: ${error.message || "An unknown error occurred."}`);
+        setMintingStatus('Minting failed. Please try again.');
     } finally {
-      setIsMinting(false);
-      setMintingStep(0);
+        setIsMinting(false);
+        setMintingStep(0);
     }
   };
 
-  // Loading and error states
   if (loading) {
      return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 flex items-center justify-center p-4">
@@ -281,11 +284,9 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
           </div>
         </div>
       </header>
-
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className={`grid gap-8 ${showCustomization ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
           <div className={showCustomization ? 'lg:col-span-2' : 'max-w-2xl mx-auto w-full'}>
-            
             <div className="flex justify-center mb-8">
               <div ref={receiptRef} className={`font-mono shadow-2xl relative transition-transform duration-300 hover:scale-[1.02] ${sizeClasses[receiptSize]}`} style={{ backgroundColor: paperEffect === 'clean' ? backgroundColor : 'transparent' }}>
                 {paperEffect === 'stacked' && (
@@ -308,52 +309,34 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
                           <span className="font-bold w-6 text-center flex-shrink-0">{index + 1}.</span>
                           <p className="font-bold uppercase truncate ml-2">{genre.name}</p>
                         </div>
-                        <span className="font-mono text-xs px-2 py-1 rounded flex-shrink-0" style={{ backgroundColor: `${primaryColor}1A`, color: `${primaryColor}B3` }}>
-                          {genre.count} pts
-                        </span>
+                        <span className="font-mono text-xs px-2 py-1 rounded flex-shrink-0" style={{ backgroundColor: `${primaryColor}1A`, color: `${primaryColor}B3` }}>{genre.count} pts</span>
                       </div>
                     ))}
                   </div>
                   <div className="text-center pt-4 border-t border-current border-opacity-20">
                     <p className="text-xs uppercase opacity-80">{customFooter}</p>
-                    <div className="mt-2 text-xs opacity-60">
-                      {new Date().toLocaleDateString()}
-                    </div>
+                    <div className="mt-2 text-xs opacity-60">{new Date().toLocaleDateString()}</div>
                   </div>
                 </div>
               </div>
             </div>
-
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
+              <button onClick={handleDownloadImage} className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
                 <Download className="h-4 w-4" />
                 <span>Download Image</span>
               </button>
-              
               {!walletAddress ? (
-                <button 
-                  onClick={connectWallet}
-                  className="flex items-center justify-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
-                >
+                <button onClick={connectWallet} className="flex items-center justify-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
                   <Wallet className="h-4 w-4" />
                   <span>Connect Wallet</span>
                 </button>
               ) : (
-                <button 
-                  onClick={mintNFT}
-                  disabled={isMinting}
-                  className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
-                >
-                  {isMinting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wallet className="h-4 w-4" />
-                  )}
+                <button onClick={mintNFT} disabled={isMinting} className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
+                  {isMinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                   <span>{isMinting ? 'Minting...' : 'Mint as NFT'}</span>
                 </button>
               )}
             </div>
-
             {isMinting && (
               <div className="mt-6 bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
                 <div className="flex items-center space-x-3 mb-4">
@@ -366,23 +349,18 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
                     <span className="text-white">{Math.round((mintingStep / 7) * 100)}%</span>
                   </div>
                   <div className="w-full bg-gray-700 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${(mintingStep / 7) * 100}%` }}
-                    ></div>
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${(mintingStep / 7) * 100}%` }}></div>
                   </div>
                   <p className="text-gray-300 text-sm">{mintingStatus}</p>
                 </div>
               </div>
             )}
           </div>
-
           {showCustomization && (
             <div className="lg:col-span-1">
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 overflow-hidden sticky top-24">
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2"><Palette className="h-5 w-5" /><span>Customization</span></h3>
-                  
                   <div className="mb-6">
                     <button onClick={() => toggleSection('appearance')} className="flex items-center justify-between w-full text-left text-white font-medium mb-4 hover:text-green-400 transition-colors">
                       <div className="flex items-center space-x-2"><Palette className="h-4 w-4" /><span>Appearance</span></div>
@@ -394,48 +372,27 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
                           <div>
                             <label className="block text-xs text-gray-400 mb-2">Text Color</label>
                             <div className="relative">
-                              <button
-                                onClick={() => setShowPrimaryPicker(!showPrimaryPicker)}
-                                className="w-full h-10 rounded-lg border border-white/20 cursor-pointer"
-                                style={{ backgroundColor: primaryColor }}
-                              />
-                              {showPrimaryPicker && (
-                                <div className="absolute z-10 mt-2">
-                                  <div className="fixed inset-0" onClick={() => setShowPrimaryPicker(false)}/>
-                                  <SketchPicker color={primaryColor} onChange={(color: ColorResult) => setPrimaryColor(color.hex)} />
-                                </div>
-                              )}
+                              <button onClick={() => setShowPrimaryPicker(!showPrimaryPicker)} className="w-full h-10 rounded-lg border border-white/20 cursor-pointer" style={{ backgroundColor: primaryColor }} />
+                              {showPrimaryPicker && (<div className="absolute z-10 mt-2"><div className="fixed inset-0" onClick={() => setShowPrimaryPicker(false)}/><SketchPicker color={primaryColor} onChange={(c: ColorResult) => setPrimaryColor(c.hex)} /></div>)}
                             </div>
                           </div>
                           <div>
                             <label className="block text-xs text-gray-400 mb-2">Background</label>
                             <div className="relative">
-                              <button
-                                onClick={() => setShowBackgroundPicker(!showBackgroundPicker)}
-                                className="w-full h-10 rounded-lg border border-white/20 cursor-pointer"
-                                style={{ backgroundColor: backgroundColor }}
-                              />
-                              {showBackgroundPicker && (
-                                <div className="absolute z-10 mt-2">
-                                  <div className="fixed inset-0" onClick={() => setShowBackgroundPicker(false)}/>
-                                  <SketchPicker color={backgroundColor} onChange={(color: ColorResult) => setBackgroundColor(color.hex)} />
-                                </div>
-                              )}
+                              <button onClick={() => setShowBackgroundPicker(!showBackgroundPicker)} className="w-full h-10 rounded-lg border border-white/20 cursor-pointer" style={{ backgroundColor: backgroundColor }} />
+                              {showBackgroundPicker && (<div className="absolute z-10 mt-2"><div className="fixed inset-0" onClick={() => setShowBackgroundPicker(false)}/><SketchPicker color={backgroundColor} onChange={(c: ColorResult) => setBackgroundColor(c.hex)} /></div>)}
                             </div>
                           </div>
                         </div>
                         <div>
                           <label className="block text-xs text-gray-400 mb-2">Paper Effect</label>
                           <div className="grid grid-cols-3 gap-1">
-                            {(['clean', 'torn', 'stacked'] as PaperEffect[]).map(effect => (
-                              <button key={effect} onClick={() => setPaperEffect(effect)} className={`py-2 px-3 rounded-lg text-xs font-medium transition-colors capitalize ${paperEffect === effect ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>{effect}</button>
-                            ))}
+                            {(['clean', 'torn', 'stacked'] as PaperEffect[]).map(e => <button key={e} onClick={() => setPaperEffect(e)} className={`py-2 px-3 rounded-lg text-xs font-medium transition-colors capitalize ${paperEffect === e ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>{e}</button>)}
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
-
                   <div className="mb-6">
                     <button onClick={() => toggleSection('content')} className="flex items-center justify-between w-full text-left text-white font-medium mb-4 hover:text-green-400 transition-colors">
                       <div className="flex items-center space-x-2"><Type className="h-4 w-4" /><span>Content</span></div>
@@ -445,16 +402,15 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-xs text-gray-400 mb-2">Receipt Title</label>
-                          <input type="text" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm" />
+                          <input type="text" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
                         </div>
                         <div>
                           <label className="block text-xs text-gray-400 mb-2">Footer Text</label>
-                          <input type="text" value={customFooter} onChange={(e) => setCustomFooter(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm" />
+                          <input type="text" value={customFooter} onChange={(e) => setCustomFooter(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
                         </div>
                       </div>
                     )}
                   </div>
-
                   <div className="mb-6">
                     <button onClick={() => toggleSection('layout')} className="flex items-center justify-between w-full text-left text-white font-medium mb-4 hover:text-green-400 transition-colors">
                       <div className="flex items-center space-x-2"><Layout className="h-4 w-4" /><span>Layout</span></div>
@@ -465,18 +421,13 @@ const GenreReceipt: React.FC<ReceiptProps> = ({ token }) => {
                         <div>
                           <label className="block text-xs text-gray-400 mb-2">Receipt Size</label>
                           <div className="grid grid-cols-3 gap-1">
-                            {(['compact', 'standard', 'large'] as ReceiptSize[]).map(size => (
-                              <button key={size} onClick={() => setReceiptSize(size)} className={`py-2 px-3 rounded-lg text-xs font-medium transition-colors capitalize ${receiptSize === size ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>{size}</button>
-                            ))}
+                             {(['compact', 'standard', 'large'] as ReceiptSize[]).map(s => <button key={s} onClick={() => setReceiptSize(s)} className={`py-2 px-3 rounded-lg text-xs font-medium transition-colors capitalize ${receiptSize === s ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>{s}</button>)}
                           </div>
                         </div>
                         <div>
                           <label className="block text-xs text-gray-400 mb-2">Number of Genres: {genreLimit}</label>
                           <input type="range" min="5" max="25" value={genreLimit} onChange={(e) => setGenreLimit(Number(e.target.value))} className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-                          <div className="flex justify-between text-xs text-gray-400 mt-1">
-                            <span>5</span>
-                            <span>25</span>
-                          </div>
+                          <div className="flex justify-between text-xs text-gray-400 mt-1"><span>5</span><span>25</span></div>
                         </div>
                         <div className="flex items-start space-x-2 bg-blue-900/20 text-blue-300 text-xs p-3 rounded-lg border border-blue-500/20">
                           <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
