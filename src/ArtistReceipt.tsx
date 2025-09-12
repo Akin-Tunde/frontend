@@ -24,6 +24,7 @@ import {
 
 import { contractAddress, contractABI } from './contract/contractInfo';
 
+import { sdk } from '@farcaster/miniapp-sdk';
 // Base network configuration
 const baseMainnet = {
   chainId: '0x2105',
@@ -68,6 +69,8 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
   const [receiptSize, setReceiptSize] = useState<ReceiptSize>('standard');
   const [paperEffect, setPaperEffect] = useState<PaperEffect>('clean');
 
+  const [isFarcaster, setIsFarcaster] = useState(false);
+  
   // UI state
   const [showCustomization, setShowCustomization] = useState<boolean>(false);
   const [expandedSections, setExpandedSections] = useState({
@@ -99,6 +102,24 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
+useEffect(() => {
+    const checkForFarcaster = async () => {
+      try {
+        // Ping the Farcaster client. If it responds, we are inside Farcaster.
+        const appData = await sdk.app.getFrameData();
+        if (appData) {
+          console.log("Environment: Farcaster client detected.");
+          setIsFarcaster(true);
+        }
+      } catch (error) {
+        // If it fails, we are in a normal browser.
+        console.log("Environment: Standard browser detected.");
+        setIsFarcaster(false);
+      }
+    };
+    checkForFarcaster();
+  }, []);
+  
   // Data fetching
   useEffect(() => {
     const fetchData = async () => {
@@ -144,72 +165,167 @@ const ArtistReceipt: React.FC<ReceiptProps> = ({ token }) => {
     }
   };
 
+  // src/ArtistReceipt.tsx
+
+  // --- REPLACE your old connectWallet function with this ---
   const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      alert("Please install MetaMask to mint an NFT.");
-      return null;
-    }
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      setWalletAddress(await signer.getAddress());
-      return signer;
-    } catch (error) {
-      console.error("Wallet connection failed", error);
-      alert("Wallet connection failed. Please try again.");
-      return null;
+    // The 'isFarcaster' flag determines the logic path
+    if (isFarcaster) {
+      // FARCASTER NATIVE PATH
+      try {
+        const walletData = await sdk.wallet.connect();
+        if (walletData) setWalletAddress(walletData.address);
+      } catch (error) {
+        console.error("Farcaster wallet connection failed:", error);
+        alert("Could not connect Farcaster wallet.");
+      }
+    } else {
+      // STANDARD BROWSER (METAMASK) PATH
+      if (typeof window.ethereum === 'undefined') {
+        return alert("Please install MetaMask to use this feature.");
+      }
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send("eth_requestAccounts", []);
+        if (accounts.length > 0) setWalletAddress(accounts[0]);
+      } catch (error) {
+        console.error("Browser wallet connection failed", error);
+        alert("Wallet connection failed. Please try again.");
+      }
     }
   };
+  // --- END OF REPLACEMENT ---
 
-  const mintNFT = async () => {
-    if (!receiptRef.current) return;
+  // This is the complete replacement for your mintNFT function.
+// It uses the `isFarcaster` flag that you set in the useEffect hook.
+
+const mintNFT = async () => {
+    // Step 1: Pre-flight checks. Ensure a wallet is connected and the receipt exists.
+    if (!walletAddress || !receiptRef.current) {
+        alert("Please connect your wallet before minting.");
+        return;
+    }
+
+    // Step 2: Set the initial state for the minting process.
     setIsMinting(true);
-    setMintingStep(1);
-    setMintingStatus("Connecting to wallet...");
+    setMintingStep(1); // Resetting the minting step counter
+    setMintingStatus("Preparing the receipt...");
 
     try {
-      if (typeof window.ethereum === 'undefined') {
-        throw new Error("Please install MetaMask to mint an NFT.");
-      }
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      setWalletAddress(await signer.getAddress());
+        // Step 3: Generate the receipt image and upload it to IPFS via your backend.
+        // This logic is identical for both the Farcaster and browser paths.
+        setMintingStep(2);
+        setMintingStatus("Generating receipt image...");
+        const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
+        const imageData = canvas.toDataURL('image/png').split(',')[1];
 
-      setMintingStep(2);
-      setMintingStatus("Checking network...");
-      const network = await provider.getNetwork();
-      if (network.chainId !== BigInt(baseMainnet.chainId)) {
-        setMintingStatus("Switching to Base network...");
-        await switchToBaseNetwork(provider);
-      }
-
-      setMintingStep(3);
-      setMintingStatus("Generating receipt image...");
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: null });
-      const imageData = canvas.toDataURL('image/png').split(',')[1];
-
-      setMintingStep(4);
-      setMintingStatus("Uploading to IPFS...");
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
-      const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
-        imageData,
-        userName,
-        timeRange: timeRangeLabels[timeRange],
-        artists: artists, // Send artists data
-        receiptType: 'artists', // Specify receipt type
-        customization: {
-          title: customTitle,
-          footer: customFooter,
-          textColor: primaryColor,
-          backgroundColor: backgroundColor,
-          artistLimit: artistLimit,
-          showArtistImage: showArtistImage,
-          receiptSize: receiptSize,
-          paperEffect: paperEffect,
+        setMintingStep(3);
+        setMintingStatus("Uploading receipt to IPFS...");
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8888';
+        const response = await axios.post(`${backendUrl}/upload-to-ipfs`, {
+            // NOTE: You will need to slightly adjust this payload for each component
+            // For ArtistReceipt.tsx:
+            imageData,
+            userName,
+            timeRange: timeRangeLabels[timeRange],
+            artists: artists,
+            receiptType: 'artists',
+            customization: {
+              title: customTitle,
+              footer: customFooter,
+              textColor: primaryColor,
+              backgroundColor: backgroundColor,
+              artistLimit: artistLimit,
+              showArtistImage: showArtistImage,
+              receiptSize: receiptSize,
+              paperEffect: paperEffect,
+            }
+            // For Receipt.tsx, you would send 'tracks' instead of 'artists'
+            // For GenreReceipt.tsx, you would send 'genres'
+        });
+        
+        const { tokenURI } = response.data;
+        if (!tokenURI) {
+            throw new Error("Failed to get a valid tokenURI from the backend.");
         }
-      });
+
+        // --- Step 4: The HYBRID LOGIC begins here. Decide which minting path to take. ---
+        if (isFarcaster) {
+            /**************************/
+            /*  FARCASTER MINT PATH   */
+            /**************************/
+            setMintingStep(4);
+            setMintingStatus("Preparing Farcaster transaction...");
+
+            // Create a read-only provider to prepare and later wait for the transaction.
+            const provider = new ethers.JsonRpcProvider(baseMainnet.rpcUrls[0]);
+            const contract = new ethers.Contract(contractAddress, contractABI, provider);
+            const unpopulatedTx = await contract.safeMint.populateTransaction(tokenURI);
+
+            setMintingStep(5);
+            setMintingStatus("Please confirm the transaction in your Farcaster client...");
+            
+            // Hand off the transaction to the Farcaster client to sign and send.
+            const txResponse = await sdk.wallet.sendTransaction({
+                to: contractAddress,
+                data: unpopulatedTx.data as `0x${string}`,
+            });
+
+            setMintingStep(6);
+            setMintingStatus(`Transaction sent! Waiting for confirmation...`);
+            await provider.waitForTransaction(txResponse.hash);
+
+        } else {
+            /**************************/
+            /* BROWSER (METAMASK) PATH*/
+            /**************************/
+            setMintingStep(4);
+            setMintingStatus("Connecting to MetaMask...");
+            
+            if (typeof window.ethereum === 'undefined') {
+                throw new Error("MetaMask is not installed. Please install it to continue.");
+            }
+            
+            // Request a signer from the browser wallet (MetaMask).
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+
+            // Check if the user is on the correct network (Base Mainnet).
+            const network = await provider.getNetwork();
+            if (network.chainId !== BigInt(baseMainnet.chainId)) {
+                setMintingStatus("Incorrect network. Please switch to Base Mainnet in MetaMask.");
+                // The switchToBaseNetwork function will prompt the user to switch.
+                await switchToBaseNetwork(provider); 
+            }
+
+            setMintingStep(5);
+            setMintingStatus("Please confirm the transaction in MetaMask...");
+
+            // Create a contract instance with the signer and send the transaction.
+            const contract = new ethers.Contract(contractAddress, contractABI, signer);
+            const transaction = await contract.safeMint(tokenURI);
+
+            setMintingStep(6);
+            setMintingStatus("Transaction sent! Waiting for confirmation...");
+            await transaction.wait();
+        }
+
+        // --- Step 5: Final success state, common to both paths ---
+        setMintingStep(7);
+        setMintingStatus("Success! Your NFT has been minted.");
+        alert("NFT minted successfully! You can view it on an explorer like OpenSea or BaseScan.");
+
+    } catch (error: any) {
+        // Generic error handling for both paths.
+        console.error("A critical error occurred during the minting process:", error);
+        alert(`Minting failed: ${error.message || "An unknown error occurred. Please check the console for details."}`);
+        setMintingStatus('Minting failed. Please try again.');
+    } finally {
+        // Final cleanup, common to both paths.
+        setIsMinting(false);
+        setMintingStep(0);
+    }
+};
 
       const { tokenURI } = response.data;
       if (!tokenURI) throw new Error("Failed to get tokenURI from backend.");
