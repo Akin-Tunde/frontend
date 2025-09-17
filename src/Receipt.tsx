@@ -408,7 +408,7 @@ const sizeClasses: Record<ReceiptSize, string> = {
               {!walletAddress ? (
               <button
       onClick={connectWallet}
-      className="flex items-center justify-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
+      className="flex items-center justify-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-4 sm:px-6 rounded-full transition-colors shadow-lg w-full sm:w-auto"
     >
       <Wallet className="h-4 w-4" />
       <span>Connect Wallet</span>
@@ -417,7 +417,7 @@ const sizeClasses: Record<ReceiptSize, string> = {
              <button
       onClick={mintNFT}
       disabled={isMinting}
-      className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
+      className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 sm:px-6 rounded-full transition-colors shadow-lg w-full sm:w-auto"
     >
       {isMinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
       <span>{isMinting ? 'Minting...' : 'Mint as NFT'}</span>
