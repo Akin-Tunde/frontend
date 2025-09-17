@@ -398,30 +398,30 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center  w-full px-4 sm:px-0">
-              <button className="flex items-center justify-center  w-full sm:w-auto space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
-                <Download className="h-4 w-4" />
-                <span>Download Image</span>
-              </button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full px-4 sm:px-0">
+       <button className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
+    <Download className="h-4 w-4" />
+    <span>Download Image</span>
+  </button>
               {!walletAddress ? (
-                <button
-                  onClick={connectWallet}
-                  className="flex items-center justify-center  w-full sm:w-auto space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
-                >
-                  <Wallet className="h-4 w-4" />
-                  <span>Connect Wallet</span>
-                </button>
+              <button
+      onClick={connectWallet}
+      className="flex items-center justify-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
+    >
+      <Wallet className="h-4 w-4" />
+      <span>Connect Wallet</span>
+    </button>
               ) : (
-                <button
-                  onClick={mintNFT}
-                  disabled={isMinting}
-                  className="flex items-center justify-center  w-full sm:w-auto space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
-                >
-                  {isMinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                  <span>{isMinting ? 'Minting...' : 'Mint as NFT'}</span>
-                </button>
-              )}
-            </div>
+             <button
+      onClick={mintNFT}
+      disabled={isMinting}
+      className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
+    >
+      {isMinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+      <span>{isMinting ? 'Minting...' : 'Mint as NFT'}</span>
+    </button>
+  )}
+</div>
 
             {/* Minting Progress */}
             {isMinting && (
