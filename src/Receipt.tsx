@@ -100,10 +100,10 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     long_term: 'ALL TIME',
   };
 
- const sizeClasses: Record<ReceiptSize, string> = {
-  compact: 'w-full sm:max-w-xs',
-  standard: 'w-full sm:max-w-sm',
-  large: 'w-full sm:max-w-md'
+const sizeClasses: Record<ReceiptSize, string> = {
+  compact: 'w-full max-w-[280px] mx-auto',
+  standard: 'w-full max-w-[320px] mx-auto', 
+  large: 'w-full max-w-[380px] mx-auto'
 };
 
   // Toggle expanded sections
@@ -282,10 +282,10 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900">
+<div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 overflow-x-hidden">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-lg border-b border-white/10 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Music className="h-6 w-6 text-green-400" />
@@ -294,48 +294,50 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
             </div>
             <button
               onClick={() => setShowCustomization(!showCustomization)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-colors border ${showCustomization
+              className={`flex items-center space-x-2 px-3 py-2 sm:px-4 rounded-full transition-colors border text-sm ${showCustomization
                   ? 'bg-green-500 text-white border-green-500'
                   : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
                 }`}
             >
               <Settings className="h-4 w-4" />
-              <span>Customize</span>
+              <span className="hidden sm:inline">Customize</span>
+<span className="sm:hidden">Edit</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className={`grid gap-8 ${showCustomization ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
 
           {/* Receipt Display Column */}
           <div className={showCustomization ? 'lg:col-span-2' : 'max-w-2xl mx-auto w-full'}>
 
             {/* Time Range Selector */}
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 mb-8 border border-white/20">
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 border border-white/20">
               <div className="flex items-center space-x-2 mb-4">
                 <Clock className="h-5 w-5 text-blue-400" />
                 <span className="text-white font-medium">Time Period</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 ">
+              <div className="grid grid-cols-3 gap-2">
                 {Object.entries(timeRangeLabels).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setTimeRange(key as TimeRange)}
-                    className={`py-3 px-4 rounded-xl font-medium transition-all text-sm ${timeRange === key
+                    className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl font-medium transition-all text-xs sm:text-sm ${timeRange === key
                         ? 'bg-green-500 text-white shadow-lg'
                         : 'text-gray-300 hover:text-white hover:bg-white/10'
                       }`}
                   >
-                    {label.split(' ').slice(-1)[0]}
+                    <span className="block sm:hidden">{key === 'short_term' ? 'Month' : key === 'medium_term' ? '6 Mo.' : 'All Time'}</span>
+<span className="hidden sm:block">{label.split(' ').slice(-1)[0]}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Receipt Component */}
-            <div className="flex justify-center mb-8">
+            <div className="flex justify-center mb-6 sm:mb-8 px-2 sm:px-0">
               <div
                 ref={receiptRef}
                 className={`font-mono shadow-2xl relative transition-transform duration-300 hover:scale-[1.02] ${sizeClasses[receiptSize]}`}
@@ -348,7 +350,7 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                   </>
                 )}
                <div
-  className={`p-4 px-3 sm:px-6 relative ${paperEffect === 'torn' ? 'torn-edge' : ''}`}
+  className={`p-4 sm:p-6 relative ${paperEffect === 'torn' ? 'torn-edge' : ''}`}
   style={{ backgroundColor: backgroundColor, color: primaryColor, zIndex: 2 }}
 >
                   <div className="text-center mb-6">
@@ -398,8 +400,8 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
             </div>
 
             {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full px-4 sm:px-0">
-       <button className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 px-4 sm:px-0">
+       <button className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 sm:px-6 rounded-full transition-colors shadow-lg w-full sm:w-auto">
     <Download className="h-4 w-4" />
     <span>Download Image</span>
   </button>
