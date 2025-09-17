@@ -100,11 +100,11 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
     long_term: 'ALL TIME',
   };
 
-  const sizeClasses: Record<ReceiptSize, string> = {
-    compact: 'max-w-xs',
-    standard: 'max-w-sm',
-    large: 'max-w-md'
-  };
+ const sizeClasses: Record<ReceiptSize, string> = {
+  compact: 'w-full sm:max-w-xs',
+  standard: 'w-full sm:max-w-sm',
+  large: 'w-full sm:max-w-md'
+};
 
   // Toggle expanded sections
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -347,10 +347,10 @@ const Receipt: React.FC<ReceiptProps> = ({ token }) => {
                     <div className="absolute top-0 left-0 w-full h-full rounded-sm" style={{ backgroundColor: backgroundColor, transform: 'rotate(1deg)', zIndex: 1 }}></div>
                   </>
                 )}
-                <div
-                  className={`p-6 relative ${paperEffect === 'torn' ? 'torn-edge' : ''}`}
-                  style={{ backgroundColor: backgroundColor, color: primaryColor, zIndex: 2 }}
-                >
+               <div
+  className={`p-4 px-3 sm:px-6 relative ${paperEffect === 'torn' ? 'torn-edge' : ''}`}
+  style={{ backgroundColor: backgroundColor, color: primaryColor, zIndex: 2 }}
+>
                   <div className="text-center mb-6">
                     <h2 className="text-2xl font-bold uppercase mb-2">{customTitle}</h2>
                     <p className="text-sm opacity-80">{timeRangeLabels[timeRange]}</p>
