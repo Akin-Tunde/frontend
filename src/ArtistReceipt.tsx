@@ -306,7 +306,7 @@ if (loading) {
                 <Clock className="h-5 w-5 text-blue-400" />
                 <span className="text-white font-medium">Time Period</span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 ">
                 {Object.entries(timeRangeLabels).map(([key, label]) => (
                   <button key={key} onClick={() => setTimeRange(key as TimeRange)} className={`py-3 px-4 rounded-xl font-medium transition-all text-sm ${timeRange === key ? 'bg-green-500 text-white shadow-lg' : 'text-gray-300 hover:text-white hover:bg-white/10'}`}>
                     {label.split(' ').slice(-1)[0]}
@@ -358,16 +358,16 @@ if (loading) {
                 </div>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex w-full px-4 sm:px-0 flex-col sm:flex-row gap-4 justify-center">
               {/* NOTE: You need to implement the handleDownloadImage function */}
-              <button className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
+              <button className="flex items-center w-full sm:w-auto justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg">
                 <Download className="h-4 w-4" />
                 <span>Download Image</span>
               </button>
               {!walletAddress ? (
                 <button 
                   onClick={connectWallet}
-                  className="flex items-center justify-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
+                  className="flex items-center justify-center w-full sm:w-auto  space-x-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
                 >
                   <Wallet className="h-4 w-4" />
                   <span>Connect Wallet</span>
@@ -376,7 +376,7 @@ if (loading) {
                 <button 
                   onClick={mintNFT}
                   disabled={isMinting}
-                  className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
+                  className="flex items-center justify-center w-full sm:w-auto space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-lg"
                 >
                   {isMinting ? ( <Loader2 className="h-4 w-4 animate-spin" /> ) : ( <Wallet className="h-4 w-4" /> )}
                   <span>{isMinting ? 'Minting...' : 'Mint as NFT'}</span>
