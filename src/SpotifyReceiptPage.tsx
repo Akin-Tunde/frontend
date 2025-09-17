@@ -33,26 +33,27 @@ function SpotifyReceiptPage() {
         {/* The main content area */}
         <main className="w-full max-w-lg">
           {/* --- FIX: Add the complete className attributes to the buttons --- */}
-          <div className="mb-8 p-1 bg-gray-800 rounded-full flex items-center justify-between text-sm">
-            <button 
-              onClick={() => setReceiptType('tracks')} 
-              className={`w-full py-2 rounded-full transition-colors ${receiptType === 'tracks' ? 'bg-green-500 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
-            >
-              Top Tracks
-            </button>
-            <button 
-              onClick={() => setReceiptType('artists')} 
-              className={`w-full py-2 rounded-full transition-colors ${receiptType === 'artists' ? 'bg-green-500 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
-            >
-              Top Artists
-            </button>
-            <button 
-              onClick={() => setReceiptType('genres')} 
-              className={`w-full py-2 rounded-full transition-colors ${receiptType === 'genres' ? 'bg-green-500 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
-            >
-              Top Genres
-            </button>
-          </div>
+       <div className="mb-8 p-2 bg-gray-800 rounded-lg flex flex-col sm:flex-row items-center gap-2 text-sm">
+    <button
+      onClick={() => setReceiptType('tracks')}
+      // Added `w-full sm:w-auto` to make buttons full-width when stacked
+      className={`w-full sm:w-auto px-4 py-2 rounded-md transition-colors ${receiptType === 'tracks' ? 'bg-green-500 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+    >
+      Top Tracks
+    </button>
+    <button
+      onClick={() => setReceiptType('artists')}
+      className={`w-full sm:w-auto px-4 py-2 rounded-md transition-colors ${receiptType === 'artists' ? 'bg-green-500 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+    >
+      Top Artists
+    </button>
+    <button
+      onClick={() => setReceiptType('genres')}
+      className={`w-full sm:w-auto px-4 py-2 rounded-md transition-colors ${receiptType === 'genres' ? 'bg-green-500 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+    >
+      Top Genres
+    </button>
+</div>
 
           {/* This conditional rendering is correct and will work once the buttons are fixed */}
           {receiptType === 'tracks' && <Receipt token={token} />}

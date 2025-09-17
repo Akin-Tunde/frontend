@@ -36,11 +36,9 @@ useEffect(() => {
 
       {/* Hero Section */}
       <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-          Your Music,
-          <br />
-          Receipted
-        </h1>
+      <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-6 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+  Your Music, Receipted
+</h1>
         <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
           Transform your listening history into beautiful, shareable receipts. 
           Connect your Spotify or Last.fm and create unique NFTs of your musical taste.
