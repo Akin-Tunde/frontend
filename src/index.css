@@ -13,3 +13,8 @@
   mask-position: bottom;
   padding-bottom: 20px; /* Add padding to prevent content from being clipped */
 }
+
+/* Add this rule */
+body {
+  overflow-x: hidden;
+}
